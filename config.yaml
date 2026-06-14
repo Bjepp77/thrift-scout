@@ -38,14 +38,20 @@ profiles:
         match_mode: "keyword_pair"
         exclude: ["strap only", "band only", "box only", "replica", "fake", "homage"]
 
-  # - name: Wife
-  #   email: wife@gmail.com
-  #   targets:
-  #     - brand: "Anthropologie"
-  #       aliases: ["Anthropologie"]
-  #       sizes: ["S", "Small"]
-  #       gender: "womens"
-  #       exclude: ["kids", "youth"]
+  - name: Alysha
+    email: alysha.edwards97@gmail.com
+    targets:
+      - brand: "Vuori"
+        aliases: ["Vuori"]
+        sizes: ["M", "Medium", "Med"]
+        gender: "womens"
+        exclude: ["kids", "youth", "boys", "girls", "mens", "men's"]
+
+      - brand: "Rainbow Sandals"
+        aliases: ["Rainbow", "Rainbow Sandals", "Rainbow Flip Flops"]
+        sizes: ["7", "Size 7", "Sz 7"]
+        gender: "womens"
+        exclude: ["kids", "youth", "boys", "mens", "men's"]
 
 settings:
   request_delay_min: 2.0
