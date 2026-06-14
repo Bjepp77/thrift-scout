@@ -36,30 +36,53 @@ def _record(item: dict, brand: str, info: dict) -> dict:
 def run(config_path: str = "config.yaml", preview_html: str | None = None) -> None:
     config = load_config(config_path)
     errors: list[str] = []
-    all_matches: dict[str, list[dict]] = {}
     total_found = total_new = watchlisted = 0
 
     with ShopGoodwillAPI(config.request_delay_min, config.request_delay_max) as api, \
          Store() as store:
 
-        seen_db = store.get_seen_ids()
+        # ── Phase 1: search once per unique (term, category) across ALL profiles ──
+        search_keys: dict[tuple[str, int], None] = {}
+        for profile in config.profiles:
+            for target in profile.targets:
+                terms = target.aliases if target.match_mode == "keyword_pair" else [target.brand]
+                for t in terms:
+                    search_keys[(t, target.category or 0)] = None
 
-        for target in config.targets:
-            print(f"[search] {target.brand}...")
+        cache: dict[tuple[str, int], list[dict]] = {}
+        for term, cat in search_keys:
+            print(f"[search] {term}...")
             try:
+                cache[(term, cat)] = api.search_all_pages(
+                    term, cat, config.page_size, config.max_pages,
+                )
+                print(f"  -> {len(cache[(term, cat)])} results")
+            except Exception as exc:
+                msg = f"Search error ({term}): {exc}"
+                errors.append(msg)
+                log.error(msg, exc_info=True)
+                cache[(term, cat)] = []
+
+        # ── Phase 2: fork results per profile ──
+        all_watchlist_ids: set[int] = set()
+
+        for profile in config.profiles:
+            seen_db = store.get_seen_ids(profile.name)
+            matches: dict[str, list[dict]] = {}
+            p_found = p_new = 0
+
+            for target in profile.targets:
                 terms = target.aliases if target.match_mode == "keyword_pair" else [target.brand]
                 dedup: set[int] = set()
                 hits: list[dict] = []
 
-                for term in terms:
-                    for item in api.search_all_pages(
-                        term, target.category or 0, config.page_size, config.max_pages,
-                    ):
+                for t in terms:
+                    for item in cache.get((t, target.category or 0), []):
                         iid = item.get("itemId")
                         if not iid or iid in dedup:
                             continue
                         dedup.add(iid)
-                        total_found += 1
+                        p_found += 1
                         if iid in seen_db:
                             continue
                         if info := match_item(item, target):
@@ -67,54 +90,56 @@ def run(config_path: str = "config.yaml", preview_html: str | None = None) -> No
 
                 if hits:
                     hits.sort(key=lambda x: x["end_time"])
-                    all_matches[target.brand] = hits
-                    total_new += len(hits)
-                print(f"  -> {len(hits)} new matches")
-            except Exception as exc:
-                msg = f"Error searching {target.brand}: {exc}"
-                errors.append(msg)
-                log.error(msg, exc_info=True)
+                    matches[target.brand] = hits
+                    p_new += len(hits)
+                    all_watchlist_ids.update(h["item_id"] for h in hits)
 
-        # Watchlist
-        if all_matches and config.sgw_username and config.sgw_password:
-            print("[auth] Authenticating...")
+            total_found += p_found
+            total_new += p_new
+
+            # Persist seen items for this profile.
+            for brand, items in matches.items():
+                store.mark_batch_seen(
+                    profile.name,
+                    [{"item_id": i["item_id"], "title": i["title"], "brand": brand} for i in items],
+                )
+
+            # Compose + send email for this profile.
+            html, subject = None, ""
+            if matches:
+                html = render_report(matches)
+                subject = f"Thrift Scout: {p_new} new item{'s' if p_new != 1 else ''} found"
+            elif errors:
+                html = render_error_report(errors)
+                subject = "Thrift Scout: Errors during scan"
+            elif config.send_empty_email:
+                html = render_empty_report()
+                subject = "Thrift Scout: Nothing new today"
+
+            if html and preview_html:
+                out = f"{preview_html}.{profile.name}.html"
+                Path(out).write_text(html)
+                print(f"[{profile.name}] Preview -> {out}")
+            elif html:
+                ok = send_email(subject, html, config, profile.email)
+                print(f"[{profile.name}] Email {'sent' if ok else 'FAILED'} -> {profile.email}")
+            else:
+                print(f"[{profile.name}] Nothing to send.")
+
+        # ── Phase 3: watchlist (shared ShopGoodwill account) ──
+        if all_watchlist_ids and config.sgw_username and config.sgw_password:
+            print(f"[auth] Watchlisting {len(all_watchlist_ids)} items...")
             try:
                 if api.ensure_auth(config.sgw_username, config.sgw_password):
-                    for items in all_matches.values():
-                        for it in items:
-                            if api.add_to_watchlist(it["item_id"]):
-                                watchlisted += 1
-                            else:
-                                errors.append(f"Watchlist failed: {it['item_id']}")
+                    for iid in all_watchlist_ids:
+                        if api.add_to_watchlist(iid):
+                            watchlisted += 1
+                        else:
+                            errors.append(f"Watchlist failed: {iid}")
                 else:
-                    errors.append("Auth failed — check credentials or re-login manually.")
+                    errors.append("Auth failed — check credentials.")
             except Exception as exc:
                 errors.append(f"Auth/watchlist error: {exc}")
-
-        # Persist
-        for brand, items in all_matches.items():
-            store.mark_batch_seen(
-                [{"item_id": i["item_id"], "title": i["title"], "brand": brand} for i in items]
-            )
-
-        # Email / preview
-        html, subject = None, ""
-        if all_matches:
-            html = render_report(all_matches)
-            subject = f"Thrift Scout: {total_new} new item{'s' if total_new != 1 else ''} found"
-        elif errors:
-            html = render_error_report(errors)
-            subject = "Thrift Scout: Errors during scan"
-        elif config.send_empty_email:
-            html = render_empty_report()
-            subject = "Thrift Scout: Nothing new today"
-
-        if html and preview_html:
-            Path(preview_html).write_text(html)
-            print(f"[preview] Saved to {preview_html}")
-        elif html:
-            ok = send_email(subject, html, config)
-            print(f"[email] {'Sent' if ok else 'Failed'} -> {config.email_recipient}")
 
         store.log_run(total_found, total_new, watchlisted, errors)
         store.purge_old()

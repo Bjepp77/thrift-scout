@@ -59,12 +59,12 @@ def render_error_report(errors: list[str]) -> str:
     )
 
 
-def send_email(subject: str, html: str, config: Config) -> bool:
-    if not all((config.email_sender, config.email_password, config.email_recipient)):
+def send_email(subject: str, html: str, config: Config, recipient: str) -> bool:
+    if not all((config.email_sender, config.email_password, recipient)):
         log.warning("Missing email config — skipping.")
         return False
     msg = MIMEText(html, "html")
-    msg["Subject"], msg["From"], msg["To"] = subject, config.email_sender, config.email_recipient
+    msg["Subject"], msg["From"], msg["To"] = subject, config.email_sender, recipient
     try:
         with smtplib.SMTP(config.smtp_host, config.smtp_port) as s:
             s.starttls()

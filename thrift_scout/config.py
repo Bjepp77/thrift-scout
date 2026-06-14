@@ -22,11 +22,16 @@ class Target(BaseModel):
     max_price: float | None = None
 
 
-class Config(BaseModel):
+class Profile(BaseModel):
+    name: str
+    email: str
     targets: list[Target]
+
+
+class Config(BaseModel):
+    profiles: list[Profile]
     sgw_username: str = _e("SGW_USERNAME")
     sgw_password: str = _e("SGW_PASSWORD")
-    email_recipient: str = _e("EMAIL_RECIPIENT", "brandonjeppson7@gmail.com")
     email_sender: str = _e("EMAIL_SENDER")
     email_password: str = _e("EMAIL_PASSWORD")
     smtp_host: str = "smtp.gmail.com"
@@ -42,7 +47,21 @@ class Config(BaseModel):
 def load_config(path: str = "config.yaml") -> Config:
     with open(path) as f:
         data = yaml.safe_load(f)
-    return Config(
-        targets=[Target(**t) for t in data.get("targets", [])],
-        **data.get("settings", {}),
-    )
+    settings = data.get("settings", {})
+
+    # Multi-profile format
+    if "profiles" in data:
+        profiles = [
+            Profile(name=p["name"], email=p["email"],
+                    targets=[Target(**t) for t in p.get("targets", [])])
+            for p in data["profiles"]
+        ]
+    else:
+        # Legacy: flat targets list → single default profile
+        profiles = [Profile(
+            name="default",
+            email=os.getenv("EMAIL_RECIPIENT", ""),
+            targets=[Target(**t) for t in data.get("targets", [])],
+        )]
+
+    return Config(profiles=profiles, **settings)
