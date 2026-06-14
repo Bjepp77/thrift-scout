@@ -1,88 +1,86 @@
 from __future__ import annotations
 
 import json
-import sqlite3
-from datetime import datetime, timedelta
+import logging
+import os
+from datetime import datetime, timedelta, timezone
 
+import httpx
+
+log = logging.getLogger(__name__)
 _PURGE_DAYS = 30
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS seen_items (
-    item_id INTEGER, profile TEXT DEFAULT '',
-    title TEXT, brand TEXT, first_seen TEXT,
-    reported INTEGER DEFAULT 0,
-    PRIMARY KEY (item_id, profile)
-);
-CREATE TABLE IF NOT EXISTS run_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT,
-    items_found INTEGER, items_new INTEGER,
-    items_watchlisted INTEGER, errors TEXT
-);
-"""
 
 
 class Store:
-    def __init__(self, db_path: str = "thrift_scout_data.db"):
-        self.conn = sqlite3.connect(db_path)
-        self._migrate()
+    """Persistent store backed by Supabase (PostgREST)."""
 
-    def __enter__(self):
+    def __init__(self) -> None:
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_ANON_KEY", "")
+        if not url or not key:
+            raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be set")
+        self._base = f"{url.rstrip('/')}/rest/v1"
+        self._headers = {
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        }
+        self._client = httpx.Client(headers=self._headers, timeout=30.0)
+
+    def __enter__(self) -> Store:
         return self
 
-    def __exit__(self, *_):
-        self.conn.close()
-
-    def _migrate(self) -> None:
-        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(seen_items)")}
-        if not cols:
-            # Fresh DB — create from scratch.
-            self.conn.executescript(_SCHEMA_SQL)
-        elif "profile" not in cols:
-            # v1 → v2: add profile column, rebuild with composite PK.
-            self.conn.executescript("""
-                ALTER TABLE seen_items RENAME TO _seen_old;
-                CREATE TABLE seen_items (
-                    item_id INTEGER, profile TEXT DEFAULT '',
-                    title TEXT, brand TEXT, first_seen TEXT,
-                    reported INTEGER DEFAULT 0,
-                    PRIMARY KEY (item_id, profile)
-                );
-                INSERT INTO seen_items (item_id,profile,title,brand,first_seen,reported)
-                    SELECT item_id,'default',title,brand,first_seen,reported FROM _seen_old;
-                DROP TABLE _seen_old;
-            """)
-            self.conn.commit()
-        # Ensure run_log exists regardless.
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS run_log ("
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT,"
-            "items_found INTEGER, items_new INTEGER,"
-            "items_watchlisted INTEGER, errors TEXT)"
-        )
-        self.conn.commit()
+    def __exit__(self, *_: object) -> None:
+        self._client.close()
 
     def get_seen_ids(self, profile: str) -> set[int]:
-        return {r[0] for r in self.conn.execute(
-            "SELECT item_id FROM seen_items WHERE profile = ?", (profile,)
-        )}
+        resp = self._client.get(
+            f"{self._base}/seen_items",
+            params={"select": "item_id", "profile": f"eq.{profile}"},
+        )
+        resp.raise_for_status()
+        return {r["item_id"] for r in resp.json()}
 
     def mark_batch_seen(self, profile: str, items: list[dict]) -> None:
-        now = datetime.utcnow().isoformat()
-        self.conn.executemany(
-            "INSERT OR IGNORE INTO seen_items (item_id,profile,title,brand,first_seen,reported) "
-            "VALUES (?,?,?,?,?,1)",
-            [(i["item_id"], profile, i["title"], i["brand"], now) for i in items],
+        if not items:
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        rows = [
+            {
+                "item_id": i["item_id"],
+                "profile": profile,
+                "title": i["title"],
+                "brand": i["brand"],
+                "first_seen": now,
+                "reported": True,
+            }
+            for i in items
+        ]
+        resp = self._client.post(
+            f"{self._base}/seen_items",
+            json=rows,
+            headers={**self._headers, "Prefer": "return=minimal,resolution=ignore-duplicates"},
         )
-        self.conn.commit()
+        resp.raise_for_status()
 
     def purge_old(self, days: int = _PURGE_DAYS) -> None:
-        cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
-        self.conn.execute("DELETE FROM seen_items WHERE first_seen < ?", (cutoff,))
-        self.conn.commit()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        resp = self._client.delete(
+            f"{self._base}/seen_items",
+            params={"first_seen": f"lt.{cutoff}"},
+        )
+        resp.raise_for_status()
 
     def log_run(self, found: int, new: int, watchlisted: int, errors: list[str]) -> None:
-        self.conn.execute(
-            "INSERT INTO run_log (timestamp,items_found,items_new,items_watchlisted,errors) "
-            "VALUES (?,?,?,?,?)",
-            (datetime.utcnow().isoformat(), found, new, watchlisted, json.dumps(errors)),
+        resp = self._client.post(
+            f"{self._base}/run_log",
+            json={
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "items_found": found,
+                "items_new": new,
+                "items_watchlisted": watchlisted,
+                "errors": errors,
+            },
         )
-        self.conn.commit()
+        resp.raise_for_status()
