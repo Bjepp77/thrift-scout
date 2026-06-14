@@ -212,14 +212,19 @@ def _execute(config: Config, preview_html: str | None) -> None:
         # ── Auth (shared ShopGoodwill account — needed for bids + watchlist) ──
         authenticated = False
         if config.sgw_username and config.sgw_password:
+            print("[auth] Logging in...")
             try:
                 authenticated = api.ensure_auth(
                     config.sgw_username, config.sgw_password,
                 )
+                print(f"[auth] {'OK' if authenticated else 'FAILED'}")
                 if not authenticated:
                     errors.append("Auth failed — check SGW credentials.")
             except Exception as exc:
+                print(f"[auth] Error: {exc}")
                 errors.append(f"Auth error: {exc}")
+        else:
+            print("[auth] No credentials configured — skipping")
 
         # ── Phase 0: check active bids ──
         active_bids: list[dict] = []
