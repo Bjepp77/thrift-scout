@@ -94,18 +94,22 @@ class ShopGoodwillAPI:
             self._delay()
         except httpx.HTTPError:
             pass
-        data = self._client.post(f"{_BASE}/SignIn/Login", json={
+        resp = self._client.post(f"{_BASE}/SignIn/Login", json={
             "browser": "firefox", "remember": False,
             "clientIpAddress": "0.0.0.4", "appVersion": "00099a1be3bb023ff17d",
             "username": self._encrypt(username),
             "password": self._encrypt(password),
-        }).json()
+        })
+        print(f"[auth] Login response: {resp.status_code}")
+        data = resp.json()
         if tok := data.get("accessToken"):
             self._token = tok
             self._client.headers["Authorization"] = f"Bearer {tok}"
             log.info("Login OK")
             return True
-        log.warning("Login failed: %s", data.get("message", "?"))
+        msg = data.get("message") or data.get("error") or str(data)
+        print(f"[auth] Login rejected: {msg}")
+        log.warning("Login failed: %s", msg)
         return False
 
     def ensure_auth(self, username: str, password: str) -> bool:
