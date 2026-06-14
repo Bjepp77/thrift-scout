@@ -62,6 +62,9 @@
 
           <div style="margin-top:6px;font-size:13px;color:#5A5A4A;">
             ${{ "%.2f"|format(bid.current_price) }}
+            {% if bid.my_max_bid is not none %}
+            &middot; Your max:&nbsp;${{ "%.2f"|format(bid.my_max_bid) }}
+            {% endif %}
             &middot; {{ bid.num_bids }}&nbsp;bid{{ 's' if bid.num_bids != 1 else '' }}
           </div>
         </td>

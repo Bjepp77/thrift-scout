@@ -160,6 +160,59 @@ class ShopGoodwillAPI:
             log.warning("Watchlist failed %d: %s", item_id, e)
             return False
 
+    def get_my_bids(self) -> list[dict]:
+        """Fetch the user's active bid list ("Auctions In Progress").
+
+        The exact endpoint isn't publicly documented, so we probe several
+        likely paths and return from the first one that answers with data.
+        Falls back to an empty list if none work.
+        """
+        if not self._token:
+            return []
+        # Candidates ordered by likelihood based on SGW API naming patterns.
+        candidates: list[tuple[str, str, dict | None, dict]] = [
+            ("POST", f"{_BASE}/Bidding/GetBiddingItems", {}, {}),
+            ("POST", f"{_BASE}/ItemBid/GetBidItemsByType",
+             {}, {"Type": "inProgress"}),
+            ("POST", f"{_BASE}/Bidding/GetAllBiddingItemsByType",
+             {}, {"Type": "inProgress"}),
+            ("GET",  f"{_BASE}/Bidding/GetBiddingItems", None, {}),
+            ("POST", f"{_BASE}/MyItems/GetBiddingItems", {}, {}),
+        ]
+        for method, url, body, params in candidates:
+            self._delay(quick=True)
+            try:
+                if method == "POST":
+                    resp = self._client.post(url, json=body, params=params)
+                else:
+                    resp = self._client.get(url, params=params)
+                if resp.status_code == 404:
+                    continue
+                resp.raise_for_status()
+                data = resp.json()
+                # Normalise response to a flat list of item dicts.
+                if isinstance(data, dict):
+                    items = (data.get("data")
+                             or data.get("items")
+                             or data.get("searchResults")
+                             or [])
+                    if isinstance(items, dict):
+                        items = items.get("items", [])
+                elif isinstance(data, list):
+                    items = data
+                else:
+                    continue
+                if (items
+                        and isinstance(items, list)
+                        and any(isinstance(i, dict) and i.get("itemId")
+                                for i in items)):
+                    log.info("Bid list found at %s (%d items)", url, len(items))
+                    return items
+            except httpx.HTTPError:
+                continue
+        log.info("No dedicated bid-list endpoint found — will use favorites")
+        return []
+
     def get_favorites(self, status: str = "open") -> list[dict]:
         """Fetch watchlisted items.  status: open | close | all"""
         if not self._token:

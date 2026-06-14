@@ -35,8 +35,73 @@ def _record(item: dict, brand: str, info: dict) -> dict:
 
 
 def _check_active_bids(api: ShopGoodwillAPI, errors: list[str]) -> list[dict]:
-    """Fetch watchlisted items and report bid status for items the user has bid on."""
-    print("[bids] Fetching watchlist...")
+    """Fetch active bids, preferring the dedicated endpoint over favorites."""
+
+    # ── Try dedicated "My Bids" endpoint first ──
+    print("[bids] Looking for active bids...")
+    my_bids = api.get_my_bids()
+    if my_bids:
+        return _bids_from_direct(my_bids, api)
+
+    # ── Fallback: scan favorites + item detail ──
+    print("[bids] Falling back to watchlist scan...")
+    return _bids_from_favorites(api, errors)
+
+
+def _bids_from_direct(items: list[dict], api: ShopGoodwillAPI) -> list[dict]:
+    """Build bid records from the dedicated bids endpoint data."""
+    bids: list[dict] = []
+    for item in items:
+        item_id = item.get("itemId")
+        if not item_id:
+            continue
+
+        current_price = float(
+            item.get("currentPrice") or item.get("minimumBid") or 0
+        )
+        my_max_bid = item.get("myMaxBid") or item.get("maxBid") or item.get("bidAmount")
+        if my_max_bid is not None:
+            my_max_bid = float(my_max_bid)
+            winning = my_max_bid >= current_price
+        else:
+            # No max-bid data — check item detail for high-bidder flag.
+            detail = api.get_item_detail(item_id)
+            is_high = detail.get("isHighBidder") if detail else None
+            winning = bool(is_high) if is_high is not None else None
+
+        num_bids = item.get("numberOfBids")
+        if num_bids is None:
+            num_bids = item.get("numBids")
+        if num_bids is None:
+            num_bids = 0
+
+        bids.append({
+            "item_id": item_id,
+            "title": item.get("title", ""),
+            "current_price": current_price,
+            "my_max_bid": my_max_bid,
+            "num_bids": num_bids,
+            "end_time": item.get("endTime", ""),
+            "time_remaining": item.get("remainingTime", ""),
+            "image_url": (
+                item.get("imageURL")
+                or item.get("mainImageUrl")
+                or item.get("largeImageUrl")
+                or ""
+            ),
+            "url": _ITEM_URL.format(item_id),
+            "winning": winning,
+        })
+
+    bids.sort(key=lambda x: x["end_time"])
+    winning_count = sum(1 for b in bids if b.get("winning"))
+    print(f"[bids] {len(bids)} active bid{'s' if len(bids) != 1 else ''} "
+          f"({winning_count} winning)")
+    return bids
+
+
+def _bids_from_favorites(api: ShopGoodwillAPI, errors: list[str]) -> list[dict]:
+    """Fallback: scan watchlisted items for ones the user has bid on."""
     favorites = api.get_favorites("open")
     if not favorites:
         print("[bids] No open watchlist items.")
@@ -70,12 +135,10 @@ def _check_active_bids(api: ShopGoodwillAPI, errors: list[str]) -> list[dict]:
         is_high_bidder = detail.get("isHighBidder")
 
         if is_bidder is not None:
-            # API explicitly tells us whether we've bid on this item.
             if not is_bidder:
                 continue
             winning = bool(is_high_bidder) if is_high_bidder is not None else None
         else:
-            # Fallback: scan bid history for our obfuscated username.
             user_bid = any(
                 match_username(api._username, b.get("bidderName", ""))
                 for b in bid_summary
@@ -86,7 +149,6 @@ def _check_active_bids(api: ShopGoodwillAPI, errors: list[str]) -> list[dict]:
                 api._username, bid_summary[0].get("bidderName", "")
             ) if bid_summary else None
 
-        # Explicit None checks — `or` treats integer 0 as falsy.
         num_bids = detail.get("numberOfBids")
         if num_bids is None:
             num_bids = detail.get("numBids")
@@ -99,6 +161,7 @@ def _check_active_bids(api: ShopGoodwillAPI, errors: list[str]) -> list[dict]:
             "current_price": float(
                 detail.get("currentPrice") or detail.get("minimumBid") or 0
             ),
+            "my_max_bid": None,
             "num_bids": num_bids,
             "end_time": detail.get("endTime") or fav.get("endTime", ""),
             "time_remaining": detail.get("remainingTime") or "",
@@ -113,7 +176,7 @@ def _check_active_bids(api: ShopGoodwillAPI, errors: list[str]) -> list[dict]:
         })
 
     bids.sort(key=lambda x: x["end_time"])
-    winning_count = sum(1 for b in bids if b["winning"])
+    winning_count = sum(1 for b in bids if b.get("winning"))
     print(f"[bids] {len(bids)} active bid{'s' if len(bids) != 1 else ''} "
           f"({winning_count} winning)")
     return bids
