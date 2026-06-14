@@ -14,9 +14,29 @@ from Crypto.Util.Padding import pad
 log = logging.getLogger(__name__)
 
 _BASE = "https://buyerapi.shopgoodwill.com/api"
-_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0"
 _KEY = b"6696D2E6F042FEC4D6E3F32AD541143B"
 _IV = b"0000000000000000"
+
+# Rotated per session — avoids a single static fingerprint across runs.
+_UAS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15",
+]
+
+# Headers a real browser sends on XHR/fetch to a same-site API.
+_BROWSER_HEADERS: dict[str, str] = {
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin": "https://shopgoodwill.com",
+    "Referer": "https://shopgoodwill.com/",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-site",
+}
 
 # Minimal diff from API defaults — every field the endpoint expects.
 _SEARCH_DEFAULTS: dict[str, Any] = {
@@ -42,7 +62,9 @@ class ShopGoodwillAPI:
         self.delay_max = delay_max
         self._token: str | None = None
         self._client = httpx.Client(
-            headers={"User-Agent": _UA}, timeout=30.0, follow_redirects=True,
+            headers={"User-Agent": random.choice(_UAS), **_BROWSER_HEADERS},
+            timeout=30.0,
+            follow_redirects=True,
         )
 
     def __enter__(self):
@@ -52,7 +74,9 @@ class ShopGoodwillAPI:
         self._client.close()
 
     def _delay(self) -> None:
-        time.sleep(random.uniform(self.delay_min, self.delay_max))
+        # Triangular distribution: most delays near the low end, occasional
+        # longer pauses — mimics real browsing cadence better than uniform.
+        time.sleep(random.triangular(self.delay_min, self.delay_max + 1.0, self.delay_min))
 
     @staticmethod
     def _encrypt(val: str) -> str:

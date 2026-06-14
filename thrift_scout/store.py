@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
@@ -35,9 +34,11 @@ class Store:
         self._client.close()
 
     def get_seen_ids(self, profile: str) -> set[int]:
+        # Explicit limit — PostgREST silently truncates at 1000 rows by
+        # default, which would cause false "new" items as the DB grows.
         resp = self._client.get(
             f"{self._base}/seen_items",
-            params={"select": "item_id", "profile": f"eq.{profile}"},
+            params={"select": "item_id", "profile": f"eq.{profile}", "limit": "100000"},
         )
         resp.raise_for_status()
         return {r["item_id"] for r in resp.json()}
@@ -65,22 +66,28 @@ class Store:
         resp.raise_for_status()
 
     def purge_old(self, days: int = _PURGE_DAYS) -> None:
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-        resp = self._client.delete(
-            f"{self._base}/seen_items",
-            params={"first_seen": f"lt.{cutoff}"},
-        )
-        resp.raise_for_status()
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            resp = self._client.delete(
+                f"{self._base}/seen_items",
+                params={"first_seen": f"lt.{cutoff}"},
+            )
+            resp.raise_for_status()
+        except Exception as exc:
+            log.warning("Purge failed (non-critical): %s", exc)
 
     def log_run(self, found: int, new: int, watchlisted: int, errors: list[str]) -> None:
-        resp = self._client.post(
-            f"{self._base}/run_log",
-            json={
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "items_found": found,
-                "items_new": new,
-                "items_watchlisted": watchlisted,
-                "errors": errors,
-            },
-        )
-        resp.raise_for_status()
+        try:
+            resp = self._client.post(
+                f"{self._base}/run_log",
+                json={
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "items_found": found,
+                    "items_new": new,
+                    "items_watchlisted": watchlisted,
+                    "errors": errors,
+                },
+            )
+            resp.raise_for_status()
+        except Exception as exc:
+            log.warning("Run log failed (non-critical): %s", exc)

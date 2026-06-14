@@ -38,12 +38,13 @@ def _size_re(s: str) -> re.Pattern[str]:
     return re.compile(rf"\b{e}\b", re.I)
 
 
-def _expand_sizes(sizes: list[str]) -> list[str]:
+@lru_cache(maxsize=64)
+def _expand_sizes(sizes: tuple[str, ...]) -> tuple[str, ...]:
     out: set[str] = set(sizes)
     for s in sizes:
         if hit := _REV.get(s.upper().strip()):
             out.update(hit)
-    return list(out)
+    return tuple(out)
 
 
 def match_brand(title: str, aliases: list[str]) -> str | None:
@@ -54,7 +55,7 @@ def match_brand(title: str, aliases: list[str]) -> str | None:
 def match_size(title: str, sizes: list[str]) -> str | None:
     if not sizes:
         return ""
-    return next((s for s in _expand_sizes(sizes) if _size_re(s).search(title)), None)
+    return next((s for s in _expand_sizes(tuple(sizes)) if _size_re(s).search(title)), None)
 
 
 def check_exclusions(title: str, exclusions: list[str]) -> str | None:

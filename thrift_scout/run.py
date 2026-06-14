@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from thrift_scout.api import ShopGoodwillAPI
-from thrift_scout.config import load_config
+from thrift_scout.config import Config, load_config
 from thrift_scout.email_report import (
     render_empty_report, render_error_report, render_report, send_email,
 )
@@ -33,8 +33,27 @@ def _record(item: dict, brand: str, info: dict) -> dict:
     }
 
 
+def _alert_all(config: Config, errors: list[str]) -> None:
+    """Best-effort error email to every profile."""
+    html = render_error_report(errors)
+    for p in config.profiles:
+        try:
+            send_email("Thrift Scout: Fatal Error", html, config, p.email)
+        except Exception:
+            pass
+
+
 def run(config_path: str = "config.yaml", preview_html: str | None = None) -> None:
     config = load_config(config_path)
+    try:
+        _execute(config, preview_html)
+    except Exception as exc:
+        log.critical("Fatal error: %s", exc, exc_info=True)
+        _alert_all(config, [f"Fatal — {type(exc).__name__}: {exc}"])
+        raise
+
+
+def _execute(config: Config, preview_html: str | None) -> None:
     errors: list[str] = []
     total_found = total_new = watchlisted = 0
 
@@ -67,7 +86,16 @@ def run(config_path: str = "config.yaml", preview_html: str | None = None) -> No
         all_watchlist_ids: set[int] = set()
 
         for profile in config.profiles:
-            seen_db = store.get_seen_ids(profile.name)
+            # Graceful dedup: if Supabase is unreachable, treat all items
+            # as new rather than crashing — user sees duplicates instead
+            # of missing items entirely.
+            try:
+                seen_db = store.get_seen_ids(profile.name)
+            except Exception as exc:
+                log.warning("Dedup unavailable for %s: %s", profile.name, exc)
+                errors.append(f"Dedup unavailable for {profile.name} — all items treated as new")
+                seen_db = set()
+
             matches: dict[str, list[dict]] = {}
             p_found = p_new = 0
 
@@ -97,12 +125,16 @@ def run(config_path: str = "config.yaml", preview_html: str | None = None) -> No
             total_found += p_found
             total_new += p_new
 
-            # Persist seen items for this profile.
+            # Persist seen items — graceful on failure.
             for brand, items in matches.items():
-                store.mark_batch_seen(
-                    profile.name,
-                    [{"item_id": i["item_id"], "title": i["title"], "brand": brand} for i in items],
-                )
+                try:
+                    store.mark_batch_seen(
+                        profile.name,
+                        [{"item_id": i["item_id"], "title": i["title"], "brand": brand} for i in items],
+                    )
+                except Exception as exc:
+                    log.warning("Could not persist seen items for %s/%s: %s", profile.name, brand, exc)
+                    errors.append(f"Seen-items save failed for {profile.name}/{brand}")
 
             # Compose + send email for this profile.
             html, subject = None, ""
