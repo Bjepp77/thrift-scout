@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import smtplib
+import time
 from datetime import datetime
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -24,9 +25,11 @@ _WRAP = (
 )
 
 
-def render_report(matches: dict[str, list[dict]]) -> str:
+def render_report(matches: dict[str, list[dict]],
+                   active_bids: list[dict] | None = None) -> str:
     return _jinja.get_template("report.html.j2").render(
         matches_by_brand=matches,
+        active_bids=active_bids or [],
         generated_at=datetime.now().strftime("%B %d, %Y at %I:%M %p"),
         total_items=sum(len(v) for v in matches.values()),
     )
@@ -65,12 +68,17 @@ def send_email(subject: str, html: str, config: Config, recipient: str) -> bool:
         return False
     msg = MIMEText(html, "html")
     msg["Subject"], msg["From"], msg["To"] = subject, config.email_sender, recipient
-    try:
-        with smtplib.SMTP(config.smtp_host, config.smtp_port) as s:
-            s.starttls()
-            s.login(config.email_sender, config.email_password)
-            s.send_message(msg)
-        return True
-    except Exception as e:
-        log.error("Email failed: %s", e)
-        return False
+    for attempt in range(3):
+        try:
+            with smtplib.SMTP(config.smtp_host, config.smtp_port) as s:
+                s.starttls()
+                s.login(config.email_sender, config.email_password)
+                s.send_message(msg)
+            return True
+        except Exception as e:
+            if attempt == 2:
+                log.error("Email failed after 3 attempts: %s", e)
+                return False
+            log.warning("Email attempt %d failed: %s — retrying", attempt + 1, e)
+            time.sleep(2 ** attempt)
+    return False

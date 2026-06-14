@@ -61,6 +61,7 @@ class ShopGoodwillAPI:
         self.delay_min = delay_min
         self.delay_max = delay_max
         self._token: str | None = None
+        self._username: str = ""
         self._client = httpx.Client(
             headers={"User-Agent": random.choice(_UAS), **_BROWSER_HEADERS},
             timeout=30.0,
@@ -73,7 +74,11 @@ class ShopGoodwillAPI:
     def __exit__(self, *_):
         self._client.close()
 
-    def _delay(self) -> None:
+    def _delay(self, quick: bool = False) -> None:
+        if quick:
+            # Lighter delay for simple GETs (item detail, favorites).
+            time.sleep(random.uniform(0.5, 1.5))
+            return
         # Triangular distribution: most delays near the low end, occasional
         # longer pauses — mimics real browsing cadence better than uniform.
         time.sleep(random.triangular(self.delay_min, self.delay_max + 1.0, self.delay_min))
@@ -104,6 +109,7 @@ class ShopGoodwillAPI:
         return False
 
     def ensure_auth(self, username: str, password: str) -> bool:
+        self._username = username
         if self._token:
             try:
                 if self._client.post(f"{_BASE}/SaveSearches/GetSaveSearches").status_code != 401:
@@ -153,3 +159,42 @@ class ShopGoodwillAPI:
         except httpx.HTTPError as e:
             log.warning("Watchlist failed %d: %s", item_id, e)
             return False
+
+    def get_favorites(self, status: str = "open") -> list[dict]:
+        """Fetch watchlisted items.  status: open | close | all"""
+        if not self._token:
+            return []
+        for attempt in range(3):
+            self._delay(quick=True)
+            try:
+                resp = self._client.post(
+                    f"{_BASE}/Favorite/GetAllFavoriteItemsByType",
+                    params={"Type": status},
+                    json={},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                return data.get("data", data) if isinstance(data, dict) else data
+            except httpx.HTTPError as e:
+                if attempt == 2:
+                    log.warning("Favorites fetch failed after 3 attempts: %s", e)
+                    return []
+                time.sleep((2 ** attempt) + random.random())
+        return []
+
+    def get_item_detail(self, item_id: int) -> dict[str, Any]:
+        """Fetch full item detail including bid history."""
+        for attempt in range(3):
+            self._delay(quick=True)
+            try:
+                resp = self._client.get(
+                    f"{_BASE}/itemDetail/GetItemDetailModelByItemId/{item_id}",
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except httpx.HTTPError as e:
+                if attempt == 2:
+                    log.warning("Item detail failed for %d: %s", item_id, e)
+                    return {}
+                time.sleep((2 ** attempt) + random.random())
+        return {}

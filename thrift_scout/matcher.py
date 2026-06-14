@@ -63,6 +63,34 @@ def check_exclusions(title: str, exclusions: list[str]) -> str | None:
     return next((e for e in exclusions if e.lower() in tl), None)
 
 
+def match_username(username: str, obfuscated_name: str) -> bool:
+    """Check if an obfuscated bidder name (e.g. 'bran****son') matches a username.
+
+    ShopGoodwill masks the middle of usernames with asterisks, preserving
+    a visible prefix and suffix.  We extract those and compare against the
+    full username — far fewer false positives than single-char matching.
+    """
+    if not username or not obfuscated_name:
+        return False
+    u = username.lower()
+    o = obfuscated_name.lower().strip()
+    if u == o:
+        return True
+    if o.count("*") < 3:
+        return False
+    star_start = o.index("*")
+    star_end = o.rindex("*")
+    prefix = o[:star_start]
+    suffix = o[star_end + 1:]
+    if not prefix or not suffix:
+        return False
+    return (
+        u.startswith(prefix)
+        and u.endswith(suffix)
+        and len(u) >= len(prefix) + len(suffix)
+    )
+
+
 def match_item(item: dict, target: Target) -> dict[str, str] | None:
     title = item.get("title", "")
     excl = target.exclude + _GENDER_EXCL.get(target.gender.lower().strip(), [])

@@ -32,6 +32,30 @@ profiles:
         gender: "mens"
         exclude: ["womens", "kids"]
 
+      - brand: "Sun Day Red"
+        aliases: ["Sun Day Red", "Sunday Red"]
+        sizes: ["XL", "X-Large", "Extra Large"]
+        gender: "mens"
+        exclude: ["kids", "youth", "womens"]
+
+      - brand: "Malbon"
+        aliases: ["Malbon", "Malbon Golf"]
+        sizes: ["XL", "X-Large", "Extra Large"]
+        gender: "mens"
+        exclude: ["kids", "youth", "womens"]
+
+      - brand: "Mantra"
+        aliases: ["Mantra"]
+        sizes: ["XL", "X-Large", "Extra Large"]
+        gender: "mens"
+        exclude: ["kids", "youth", "womens"]
+
+      - brand: "Brooks Brothers"
+        aliases: ["Brooks Brothers", "Brooks Bros"]
+        sizes: ["XL", "X-Large", "Extra Large"]
+        gender: "mens"
+        exclude: ["kids", "youth", "womens"]
+
       - brand: "Omega x Swatch"
         aliases: ["Omega x Swatch", "Omega Swatch", "MoonSwatch", "Moon Swatch", "Bioceramic Moonswatch"]
         sizes: []

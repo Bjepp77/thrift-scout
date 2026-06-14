@@ -8,9 +8,77 @@
   <div style="text-align:center;padding:24px 0 16px;">
     <h1 style="color:#2C2C2C;font-size:22px;font-weight:700;margin:0;letter-spacing:0.3px;">Thrift Scout</h1>
     <p style="color:#8C8C7A;font-size:13px;margin:6px 0 0;">
-      {{ total_items }}&nbsp;new item{{ 's' if total_items != 1 else '' }} found &mdash; {{ generated_at }}
+      {% if total_items %}{{ total_items }}&nbsp;new item{{ 's' if total_items != 1 else '' }}{% endif %}
+      {% if total_items and active_bids %} + {% endif %}
+      {% if active_bids %}{{ active_bids|length }}&nbsp;active bid{{ 's' if active_bids|length != 1 else '' }}{% endif %}
+      &mdash; {{ generated_at }}
     </p>
   </div>
+
+  {# ── Active Bids ── #}
+  {% if active_bids %}
+  <div style="margin-bottom:24px;">
+    <div style="background:#4A6A8C;color:#FFFFFF;padding:10px 16px;border-radius:6px 6px 0 0;font-size:14px;font-weight:600;">
+      Your Active Bids&ensp;({{ active_bids|length }})
+    </div>
+
+    {% for bid in active_bids %}
+    <div style="background:#FFFFFF;border:1px solid #D5CFC4;border-top:none;padding:14px 16px;{% if loop.last %}border-radius:0 0 6px 6px;{% endif %}">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+
+        {# thumbnail #}
+        <td width="80" valign="top" style="padding-right:12px;">
+          {% if bid.image_url %}
+          <img src="{{ bid.image_url }}" alt="" width="72" height="72"
+               style="border-radius:4px;object-fit:cover;display:block;background:#E8E0D0;">
+          {% else %}
+          <div style="width:72px;height:72px;background:#E8E0D0;border-radius:4px;"></div>
+          {% endif %}
+        </td>
+
+        {# details #}
+        <td valign="top" style="padding-right:8px;">
+          <a href="{{ bid.url }}" target="_blank" rel="noopener"
+             style="color:#2C2C2C;text-decoration:none;font-size:14px;font-weight:500;line-height:1.35;">
+            {{ bid.title|truncate(90, True, '...') }}
+          </a>
+
+          <div style="margin-top:6px;">
+            {# bid status badge #}
+            {% if bid.winning %}
+            <span style="display:inline-block;background:#5A8C3C;color:#FFFFFF;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:600;">
+              WINNING
+            </span>
+            {% elif bid.winning is not none %}
+            <span style="display:inline-block;background:#C0392B;color:#FFFFFF;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:600;">
+              OUTBID
+            </span>
+            {% endif %}
+            {# time-remaining badge #}
+            <span style="display:inline-block;background:#B8926A;color:#FFFFFF;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:600;{% if bid.winning is not none %}margin-left:4px;{% endif %}">
+              {{ bid.time_remaining or 'ending soon' }}
+            </span>
+          </div>
+
+          <div style="margin-top:6px;font-size:13px;color:#5A5A4A;">
+            ${{ "%.2f"|format(bid.current_price) }}
+            &middot; {{ bid.num_bids }}&nbsp;bid{{ 's' if bid.num_bids != 1 else '' }}
+          </div>
+        </td>
+
+        {# CTA #}
+        <td width="70" valign="middle" align="right">
+          <a href="{{ bid.url }}" target="_blank" rel="noopener"
+             style="display:inline-block;background:#4A6A8C;color:#FFFFFF;padding:8px 14px;border-radius:5px;font-size:12px;text-decoration:none;font-weight:600;">
+            View
+          </a>
+        </td>
+
+      </tr></table>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   {% for brand, items in matches_by_brand.items() %}
   {# ── Brand section ── #}

@@ -8,12 +8,13 @@ from thrift_scout.config import Config, load_config
 from thrift_scout.email_report import (
     render_empty_report, render_error_report, render_report, send_email,
 )
-from thrift_scout.matcher import match_item
+from thrift_scout.matcher import match_item, match_username
 from thrift_scout.store import Store
 
 log = logging.getLogger(__name__)
 
 _ITEM_URL = "https://shopgoodwill.com/item/{}"
+_MAX_BID_CHECKS = 25
 
 
 def _record(item: dict, brand: str, info: dict) -> dict:
@@ -31,6 +32,91 @@ def _record(item: dict, brand: str, info: dict) -> dict:
         "brand_matched": info["brand_matched"],
         "size_matched": info.get("size_matched", ""),
     }
+
+
+def _check_active_bids(api: ShopGoodwillAPI, errors: list[str]) -> list[dict]:
+    """Fetch watchlisted items and report bid status for items the user has bid on."""
+    print("[bids] Fetching watchlist...")
+    favorites = api.get_favorites("open")
+    if not favorites:
+        print("[bids] No open watchlist items.")
+        return []
+
+    total = len(favorites)
+    cap = min(total, _MAX_BID_CHECKS)
+    if total > _MAX_BID_CHECKS:
+        print(f"[bids] {total} open items (checking first {cap})...")
+    else:
+        print(f"[bids] {total} open items — checking bid status...")
+    bids: list[dict] = []
+    checked = 0
+
+    for fav in favorites:
+        if checked >= _MAX_BID_CHECKS:
+            break
+        item_id = fav.get("itemId")
+        if not item_id:
+            continue
+
+        detail = api.get_item_detail(item_id)
+        if not detail:
+            continue
+        checked += 1
+
+        bid_summary = (detail.get("bidHistory") or {}).get("bidSummary") or []
+
+        # Prefer explicit auth-aware fields the API may return when logged in.
+        is_bidder = detail.get("isBidder")
+        is_high_bidder = detail.get("isHighBidder")
+
+        if is_bidder is not None:
+            # API explicitly tells us whether we've bid on this item.
+            if not is_bidder:
+                continue
+            winning = bool(is_high_bidder) if is_high_bidder is not None else None
+        else:
+            # Fallback: scan bid history for our obfuscated username.
+            user_bid = any(
+                match_username(api._username, b.get("bidderName", ""))
+                for b in bid_summary
+            )
+            if not user_bid:
+                continue
+            winning = match_username(
+                api._username, bid_summary[0].get("bidderName", "")
+            ) if bid_summary else None
+
+        # Explicit None checks — `or` treats integer 0 as falsy.
+        num_bids = detail.get("numberOfBids")
+        if num_bids is None:
+            num_bids = detail.get("numBids")
+        if num_bids is None:
+            num_bids = len(bid_summary)
+
+        bids.append({
+            "item_id": item_id,
+            "title": detail.get("title") or fav.get("title", ""),
+            "current_price": float(
+                detail.get("currentPrice") or detail.get("minimumBid") or 0
+            ),
+            "num_bids": num_bids,
+            "end_time": detail.get("endTime") or fav.get("endTime", ""),
+            "time_remaining": detail.get("remainingTime") or "",
+            "image_url": (
+                detail.get("imageURL")
+                or detail.get("mainImageUrl")
+                or detail.get("largeImageUrl")
+                or ""
+            ),
+            "url": _ITEM_URL.format(item_id),
+            "winning": winning,
+        })
+
+    bids.sort(key=lambda x: x["end_time"])
+    winning_count = sum(1 for b in bids if b["winning"])
+    print(f"[bids] {len(bids)} active bid{'s' if len(bids) != 1 else ''} "
+          f"({winning_count} winning)")
+    return bids
 
 
 def _alert_all(config: Config, errors: list[str]) -> None:
@@ -59,6 +145,27 @@ def _execute(config: Config, preview_html: str | None) -> None:
 
     with ShopGoodwillAPI(config.request_delay_min, config.request_delay_max) as api, \
          Store() as store:
+
+        # ── Auth (shared ShopGoodwill account — needed for bids + watchlist) ──
+        authenticated = False
+        if config.sgw_username and config.sgw_password:
+            try:
+                authenticated = api.ensure_auth(
+                    config.sgw_username, config.sgw_password,
+                )
+                if not authenticated:
+                    errors.append("Auth failed — check SGW credentials.")
+            except Exception as exc:
+                errors.append(f"Auth error: {exc}")
+
+        # ── Phase 0: check active bids ──
+        active_bids: list[dict] = []
+        if authenticated:
+            try:
+                active_bids = _check_active_bids(api, errors)
+            except Exception as exc:
+                log.warning("Bid check failed: %s", exc)
+                errors.append(f"Bid check error: {exc}")
 
         # ── Phase 1: search once per unique (term, category) across ALL profiles ──
         search_keys: dict[tuple[str, int], None] = {}
@@ -138,9 +245,14 @@ def _execute(config: Config, preview_html: str | None) -> None:
 
             # Compose + send email for this profile.
             html, subject = None, ""
-            if matches:
-                html = render_report(matches)
-                subject = f"Thrift Scout: {p_new} new item{'s' if p_new != 1 else ''} found"
+            if matches or active_bids:
+                html = render_report(matches, active_bids=active_bids)
+                parts = []
+                if p_new:
+                    parts.append(f"{p_new} new item{'s' if p_new != 1 else ''}")
+                if active_bids:
+                    parts.append(f"{len(active_bids)} active bid{'s' if len(active_bids) != 1 else ''}")
+                subject = f"Thrift Scout: {' + '.join(parts)}"
             elif errors:
                 html = render_error_report(errors)
                 subject = "Thrift Scout: Errors during scan"
@@ -159,19 +271,13 @@ def _execute(config: Config, preview_html: str | None) -> None:
                 print(f"[{profile.name}] Nothing to send.")
 
         # ── Phase 3: watchlist (shared ShopGoodwill account) ──
-        if all_watchlist_ids and config.sgw_username and config.sgw_password:
-            print(f"[auth] Watchlisting {len(all_watchlist_ids)} items...")
-            try:
-                if api.ensure_auth(config.sgw_username, config.sgw_password):
-                    for iid in all_watchlist_ids:
-                        if api.add_to_watchlist(iid):
-                            watchlisted += 1
-                        else:
-                            errors.append(f"Watchlist failed: {iid}")
+        if all_watchlist_ids and authenticated:
+            print(f"[watchlist] Adding {len(all_watchlist_ids)} items...")
+            for iid in all_watchlist_ids:
+                if api.add_to_watchlist(iid):
+                    watchlisted += 1
                 else:
-                    errors.append("Auth failed — check credentials.")
-            except Exception as exc:
-                errors.append(f"Auth/watchlist error: {exc}")
+                    errors.append(f"Watchlist failed: {iid}")
 
         store.log_run(total_found, total_new, watchlisted, errors)
         store.purge_old()

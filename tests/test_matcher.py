@@ -1,6 +1,6 @@
-"""Unit tests for the matching engine."""
+"""Unit tests for the matching engine and bid-detection helpers."""
 from thrift_scout.config import Target
-from thrift_scout.matcher import check_exclusions, match_brand, match_item, match_size
+from thrift_scout.matcher import check_exclusions, match_brand, match_item, match_size, match_username
 
 # ── Brand ──
 
@@ -81,3 +81,37 @@ def test_price_cap():
     t = Target(brand="Test", aliases=["Test"], sizes=[], max_price=25.0)
     assert match_item({"title": "Test Item", "currentPrice": 30.0, "itemId": 6}, t) is None
     assert match_item({"title": "Test Item", "currentPrice": 20.0, "itemId": 7}, t) is not None
+
+
+# ── Username obfuscation matching ──
+
+def test_username_match_exact():
+    assert match_username("brandonjeppson7", "brandonjeppson7")
+
+def test_username_match_obfuscated_prefix_suffix():
+    # "bran****on7" → prefix "bran", suffix "on7"
+    assert match_username("brandonjeppson7", "bran****on7")
+
+def test_username_match_single_char_prefix():
+    # "b****7" → prefix "b", suffix "7"
+    assert match_username("brandonjeppson7", "b****7")
+
+def test_username_match_case_insensitive():
+    assert match_username("BrandonJeppson7", "bran****on7")
+
+def test_username_no_match_wrong_prefix():
+    assert not match_username("brandonjeppson7", "zran****on7")
+
+def test_username_no_match_wrong_suffix():
+    assert not match_username("brandonjeppson7", "bran****xyz")
+
+def test_username_no_match_no_asterisks():
+    assert not match_username("brandonjeppson7", "otherperson")
+
+def test_username_no_match_empty():
+    assert not match_username("", "b****n")
+    assert not match_username("brandon", "")
+
+def test_username_no_match_short_username():
+    # Username too short to contain both prefix and suffix
+    assert not match_username("ab", "abc****xyz")
