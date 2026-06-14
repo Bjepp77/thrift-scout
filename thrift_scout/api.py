@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import logging
 import random
+import re
 import time
 import urllib.parse
 from typing import Any
@@ -88,16 +89,24 @@ class ShopGoodwillAPI:
         ct = AES.new(_KEY, AES.MODE_CBC, _IV).encrypt(pad(val.encode(), 16))
         return urllib.parse.quote(base64.b64encode(ct))
 
-    def login(self, username: str, password: str) -> bool:
+    def _get_app_version(self) -> str:
+        """Extract the current appVersion from the main.js bundle hash."""
         try:
-            self._client.get("https://shopgoodwill.com/signin")
-            self._delay()
+            resp = self._client.get("https://shopgoodwill.com/signin")
+            if m := re.search(r'main\.([a-f0-9]+)\.js', resp.text):
+                return m.group(1)
         except httpx.HTTPError:
             pass
+        return "e249b8153dbb84bc"  # fallback
+
+    def login(self, username: str, password: str) -> bool:
+        app_version = self._get_app_version()
+        self._delay()
         resp = self._client.post(f"{_BASE}/SignIn/Login", json={
-            "browser": "firefox", "remember": False,
-            "clientIpAddress": "0.0.0.4", "appVersion": "00099a1be3bb023ff17d",
-            "username": self._encrypt(username),
+            "browser": self._client.headers.get("User-Agent", ""),
+            "remember": False,
+            "appVersion": app_version,
+            "userName": self._encrypt(username),
             "password": self._encrypt(password),
         })
         print(f"[auth] Login response: {resp.status_code}")
