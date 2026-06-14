@@ -23,7 +23,8 @@ def _record(item: dict, brand: str, info: dict) -> dict:
         "item_id": iid,
         "title": item.get("title", ""),
         "current_price": float(item.get("currentPrice") or item.get("minimumBid") or 0),
-        "num_bids": item.get("numBids") or item.get("numberOfBids") or 0,
+        "num_bids": item.get("numBids") if item.get("numBids") is not None
+                    else (item.get("numberOfBids") if item.get("numberOfBids") is not None else 0),
         "end_time": item.get("endTime", ""),
         "time_remaining": item.get("remainingTime", ""),
         "image_url": item.get("imageURL") or item.get("mainImageUrl") or "",
@@ -212,7 +213,6 @@ def _execute(config: Config, preview_html: str | None) -> None:
         # ── Auth (shared ShopGoodwill account — needed for bids + watchlist) ──
         authenticated = False
         if config.sgw_username and config.sgw_password:
-            print("[auth] Logging in...")
             try:
                 authenticated = api.ensure_auth(
                     config.sgw_username, config.sgw_password,
@@ -223,8 +223,6 @@ def _execute(config: Config, preview_html: str | None) -> None:
             except Exception as exc:
                 print(f"[auth] Error: {exc}")
                 errors.append(f"Auth error: {exc}")
-        else:
-            print("[auth] No credentials configured — skipping")
 
         # ── Phase 0: check active bids ──
         active_bids: list[dict] = []

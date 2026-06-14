@@ -20,12 +20,12 @@ _IV = b"0000000000000000"
 
 # Rotated per session — avoids a single static fingerprint across runs.
 _UAS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:139.0) Gecko/20100101 Firefox/139.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15",
 ]
 
 # Headers a real browser sends on XHR/fetch to a same-site API.
@@ -109,16 +109,13 @@ class ShopGoodwillAPI:
             "userName": self._encrypt(username),
             "password": self._encrypt(password),
         })
-        print(f"[auth] Login response: {resp.status_code}")
         data = resp.json()
         if tok := data.get("accessToken"):
             self._token = tok
             self._client.headers["Authorization"] = f"Bearer {tok}"
             log.info("Login OK")
             return True
-        msg = data.get("message") or data.get("error") or str(data)
-        print(f"[auth] Login rejected: {msg}")
-        log.warning("Login failed: %s", msg)
+        log.warning("Login failed: %s", data.get("message", "unknown"))
         return False
 
     def ensure_auth(self, username: str, password: str) -> bool:
@@ -143,7 +140,7 @@ class ShopGoodwillAPI:
                 resp = self._client.post(f"{_BASE}/Search/ItemListing", json=body)
                 resp.raise_for_status()
                 return resp.json()
-            except httpx.HTTPError:
+            except Exception:
                 if attempt == 2:
                     raise
                 time.sleep((2 ** attempt) + random.random())
@@ -165,13 +162,17 @@ class ShopGoodwillAPI:
     def add_to_watchlist(self, item_id: int) -> bool:
         if not self._token:
             return False
-        try:
-            self._delay()
-            return self._client.get(f"{_BASE}/Favorite/AddToFavorite",
-                                    params={"itemId": item_id}).status_code == 200
-        except httpx.HTTPError as e:
-            log.warning("Watchlist failed %d: %s", item_id, e)
-            return False
+        for attempt in range(3):
+            self._delay(quick=True)
+            try:
+                return self._client.get(f"{_BASE}/Favorite/AddToFavorite",
+                                        params={"itemId": item_id}).status_code == 200
+            except Exception as e:
+                if attempt == 2:
+                    log.warning("Watchlist failed %d: %s", item_id, e)
+                    return False
+                time.sleep((2 ** attempt) + random.random())
+        return False
 
     def get_my_bids(self, days_back: int = 180) -> list[dict]:
         """Fetch the user's active bid list ("Auctions In Progress")."""
@@ -195,11 +196,12 @@ class ShopGoodwillAPI:
                 if isinstance(data, list):
                     return data
                 return []
-            except httpx.HTTPError as e:
+            except Exception as e:
                 if attempt == 2:
                     log.warning("Open auctions fetch failed: %s", e)
                     return []
                 time.sleep((2 ** attempt) + random.random())
+        return []
 
     def get_favorites(self, status: str = "open") -> list[dict]:
         """Fetch watchlisted items.  status: open | close | all"""
@@ -216,7 +218,7 @@ class ShopGoodwillAPI:
                 resp.raise_for_status()
                 data = resp.json()
                 return data.get("data", data) if isinstance(data, dict) else data
-            except httpx.HTTPError as e:
+            except Exception as e:
                 if attempt == 2:
                     log.warning("Favorites fetch failed after 3 attempts: %s", e)
                     return []
@@ -233,7 +235,7 @@ class ShopGoodwillAPI:
                 )
                 resp.raise_for_status()
                 return resp.json()
-            except httpx.HTTPError as e:
+            except Exception as e:
                 if attempt == 2:
                     log.warning("Item detail failed for %d: %s", item_id, e)
                     return {}
