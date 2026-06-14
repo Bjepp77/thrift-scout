@@ -173,13 +173,14 @@ class ShopGoodwillAPI:
                 )
                 resp.raise_for_status()
                 data = resp.json()
+                if isinstance(data, dict):
+                    inner = data.get("data")
+                    if isinstance(inner, dict):
+                        return inner.get("auctionItems", [])
+                    if isinstance(inner, list):
+                        return inner
                 if isinstance(data, list):
                     return data
-                if isinstance(data, dict):
-                    return (data.get("data")
-                            or data.get("items")
-                            or data.get("searchResults")
-                            or [])
                 return []
             except httpx.HTTPError as e:
                 if attempt == 2:

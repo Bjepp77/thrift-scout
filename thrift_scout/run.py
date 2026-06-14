@@ -56,24 +56,29 @@ def _bids_from_direct(items: list[dict], api: ShopGoodwillAPI) -> list[dict]:
         if not item_id:
             continue
 
-        current_price = float(
-            item.get("currentPrice") or item.get("minimumBid") or 0
-        )
-        my_max_bid = item.get("myMaxBid") or item.get("maxBid") or item.get("bidAmount")
-        if my_max_bid is not None:
-            my_max_bid = float(my_max_bid)
-            winning = my_max_bid >= current_price
-        else:
-            # No max-bid data — check item detail for high-bidder flag.
-            detail = api.get_item_detail(item_id)
-            is_high = detail.get("isHighBidder") if detail else None
-            winning = bool(is_high) if is_high is not None else None
+        current_price = float(item.get("currentPrice") or 0)
+        max_bid_raw = item.get("maxBidAmount")
+        my_max_bid = float(max_bid_raw) if max_bid_raw is not None else None
 
-        num_bids = item.get("numberOfBids")
-        if num_bids is None:
-            num_bids = item.get("numBids")
+        # quantityWon=1 → winning, 0 → outbid.  Also cross-check with price.
+        qty_won = item.get("quantityWon")
+        if my_max_bid is not None:
+            winning = my_max_bid >= current_price
+        elif qty_won is not None:
+            winning = qty_won > 0
+        else:
+            winning = None
+
+        num_bids = item.get("numBids")
         if num_bids is None:
             num_bids = 0
+
+        # imageURL is empty in this endpoint — build from imageServer.
+        image_url = item.get("imageURL") or ""
+        if not image_url:
+            server = item.get("imageServer", "")
+            if server:
+                image_url = f"{server}{item_id}_1_tn.jpg"
 
         bids.append({
             "item_id": item_id,
@@ -82,13 +87,8 @@ def _bids_from_direct(items: list[dict], api: ShopGoodwillAPI) -> list[dict]:
             "my_max_bid": my_max_bid,
             "num_bids": num_bids,
             "end_time": item.get("endTime", ""),
-            "time_remaining": item.get("remainingTime", ""),
-            "image_url": (
-                item.get("imageURL")
-                or item.get("mainImageUrl")
-                or item.get("largeImageUrl")
-                or ""
-            ),
+            "time_remaining": item.get("remainingTime") or "",
+            "image_url": image_url,
             "url": _ITEM_URL.format(item_id),
             "winning": winning,
         })
