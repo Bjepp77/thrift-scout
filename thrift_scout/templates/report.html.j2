@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;background:#E8E0D0;margin:0;padding:20px;">
+<div style="max-width:640px;margin:0 auto;">
+
+  {# ── Header ── #}
+  <div style="text-align:center;padding:24px 0 16px;">
+    <h1 style="color:#2C2C2C;font-size:22px;font-weight:700;margin:0;letter-spacing:0.3px;">Thrift Scout</h1>
+    <p style="color:#8C8C7A;font-size:13px;margin:6px 0 0;">
+      {{ total_items }}&nbsp;new item{{ 's' if total_items != 1 else '' }} found &mdash; {{ generated_at }}
+    </p>
+  </div>
+
+  {% for brand, items in matches_by_brand.items() %}
+  {# ── Brand section ── #}
+  <div style="margin-bottom:24px;">
+    <div style="background:#7A8C6E;color:#FFFFFF;padding:10px 16px;border-radius:6px 6px 0 0;font-size:14px;font-weight:600;">
+      {{ brand }}&ensp;({{ items|length }})
+    </div>
+
+    {% for item in items %}
+    <div style="background:#FFFFFF;border:1px solid #D5CFC4;border-top:none;padding:14px 16px;{% if loop.last %}border-radius:0 0 6px 6px;{% endif %}">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+
+        {# thumbnail #}
+        <td width="80" valign="top" style="padding-right:12px;">
+          {% if item.image_url %}
+          <img src="{{ item.image_url }}" alt="" width="72" height="72"
+               style="border-radius:4px;object-fit:cover;display:block;background:#E8E0D0;">
+          {% else %}
+          <div style="width:72px;height:72px;background:#E8E0D0;border-radius:4px;"></div>
+          {% endif %}
+        </td>
+
+        {# details #}
+        <td valign="top" style="padding-right:8px;">
+          <a href="{{ item.url }}" target="_blank" rel="noopener"
+             style="color:#2C2C2C;text-decoration:none;font-size:14px;font-weight:500;line-height:1.35;">
+            {{ item.title|truncate(90, True, '...') }}
+          </a>
+
+          <div style="margin-top:6px;">
+            {# time-remaining badge #}
+            <span style="display:inline-block;background:#B8926A;color:#FFFFFF;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:600;">
+              {{ item.time_remaining or 'ending soon' }}
+            </span>
+            {% if item.size_matched %}
+            <span style="display:inline-block;background:#E8E0D0;color:#5A5A4A;padding:2px 8px;border-radius:3px;font-size:11px;margin-left:4px;">
+              Size:&nbsp;{{ item.size_matched }}
+            </span>
+            {% endif %}
+          </div>
+
+          <div style="margin-top:6px;font-size:13px;color:#5A5A4A;">
+            ${{ "%.2f"|format(item.current_price) }}
+            {% if item.num_bids is not none %}
+            &middot; {{ item.num_bids }}&nbsp;bid{{ 's' if item.num_bids != 1 else '' }}
+            {% endif %}
+          </div>
+        </td>
+
+        {# CTA #}
+        <td width="70" valign="middle" align="right">
+          <a href="{{ item.url }}" target="_blank" rel="noopener"
+             style="display:inline-block;background:#7A8C6E;color:#FFFFFF;padding:8px 14px;border-radius:5px;font-size:12px;text-decoration:none;font-weight:600;">
+            View
+          </a>
+        </td>
+
+      </tr></table>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  {# ── Footer ── #}
+  <div style="text-align:center;padding:16px 0;color:#8C8C7A;font-size:11px;">
+    Thrift Scout &middot; Daily digest
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,45 @@
+name: Daily Thrift Scout Scan
+
+on:
+  schedule:
+    - cron: "0 14 * * *"   # 7:00 AM Mountain Time (UTC-7)
+  workflow_dispatch:        # manual trigger from Actions tab
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Restore the seen-items DB from the previous run so dedup works.
+      - name: Restore seen-items database
+        uses: actions/cache/restore@v4
+        with:
+          path: thrift_scout_data.db
+          key: thrift-scout-db-${{ github.run_id }}
+          restore-keys: thrift-scout-db-
+
+      - name: Run scan
+        env:
+          SGW_USERNAME: ${{ secrets.SGW_USERNAME }}
+          SGW_PASSWORD: ${{ secrets.SGW_PASSWORD }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECIPIENT: ${{ secrets.EMAIL_RECIPIENT }}
+        run: python -m thrift_scout run
+
+      # Persist the DB for the next run.
+      - name: Save seen-items database
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: thrift_scout_data.db
+          key: thrift-scout-db-${{ github.run_id }}

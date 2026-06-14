@@ -1,0 +1,47 @@
+# Thrift Scout — target configuration
+# Copy this to config.yaml and edit to taste. Credentials go in .env, not here.
+
+targets:
+  - brand: "Patagonia"
+    aliases: ["Patagonia"]
+    sizes: ["XL", "X-Large", "Extra Large"]
+    gender: "mens"
+    exclude: ["kids", "youth", "toddler", "girls", "boys", "damaged", "stained"]
+
+  - brand: "KUHL"
+    aliases: ["KUHL", "Kuhl", "Kühl"]
+    sizes: ["XL", "X-Large", "Extra Large"]
+    gender: "mens"
+    exclude: ["kids", "youth"]
+
+  - brand: "Dr. Martens"
+    aliases: ["Dr. Martens", "Dr Martens", "Doc Martens", "Docs", "DM's"]
+    sizes: ["11", "11M", "Mens 11", "US 11"]
+    gender: "mens"
+    exclude: ["kids", "youth", "womens 11"]
+
+  - brand: "Blundstone"
+    aliases: ["Blundstone", "Blundstones", "Blunnies"]
+    sizes: ["11.5", "11 1/2", "US 11.5"]
+    gender: "mens"
+    exclude: ["kids", "youth"]
+
+  - brand: "Lululemon"
+    aliases: ["Lululemon", "Lulu"]
+    sizes: ["36", "W36", "36 waist"]
+    gender: "mens"
+    exclude: ["womens", "kids"]
+
+  - brand: "Omega x Swatch"
+    aliases: ["Omega x Swatch", "Omega Swatch", "MoonSwatch", "Moon Swatch", "Bioceramic Moonswatch"]
+    sizes: []
+    match_mode: "keyword_pair"
+    exclude: ["strap only", "band only", "box only", "replica", "fake", "homage"]
+
+settings:
+  request_delay_min: 2.0
+  request_delay_max: 5.0
+  max_items_per_email: 50
+  send_empty_email: true
+  page_size: 40
+  max_pages: 5
