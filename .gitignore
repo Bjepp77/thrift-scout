@@ -3,7 +3,6 @@
 *.pyc
 __pycache__/
 thrift_scout_data.db
-config.yaml
 *.egg-info/
 dist/
 build/

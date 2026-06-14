@@ -1,6 +1,3 @@
-# Thrift Scout — target configuration
-# Copy this to config.yaml and edit to taste. Credentials go in .env, not here.
-
 targets:
   - brand: "Patagonia"
     aliases: ["Patagonia"]
