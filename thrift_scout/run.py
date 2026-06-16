@@ -310,14 +310,16 @@ def _execute(config: Config, preview_html: str | None) -> None:
                     errors.append(f"Seen-items save failed for {profile.name}/{brand}")
 
             # Compose + send email for this profile.
+            # Bids are tied to the SGW account — only show to the first profile.
+            profile_bids = active_bids if profile == config.profiles[0] else []
             html, subject = None, ""
-            if matches or active_bids:
-                html = render_report(matches, active_bids=active_bids)
+            if matches or profile_bids:
+                html = render_report(matches, active_bids=profile_bids)
                 parts = []
                 if p_new:
                     parts.append(f"{p_new} new item{'s' if p_new != 1 else ''}")
-                if active_bids:
-                    parts.append(f"{len(active_bids)} active bid{'s' if len(active_bids) != 1 else ''}")
+                if profile_bids:
+                    parts.append(f"{len(profile_bids)} active bid{'s' if len(profile_bids) != 1 else ''}")
                 subject = f"Thrift Scout: {' + '.join(parts)}"
             elif errors:
                 html = render_error_report(errors)
