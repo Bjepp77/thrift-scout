@@ -50,6 +50,11 @@ def test_exclusion_hit():
 def test_exclusion_miss():
     assert check_exclusions("Patagonia Fleece XL Mens", ["kids", "youth"]) is None
 
+def test_exclusion_no_substring_false_positive():
+    """'mens' must not match inside 'womens', 'men's' must not match inside 'women's'."""
+    assert check_exclusions("Vuori Womens Jogger Medium", ["mens"]) is None
+    assert check_exclusions("Vuori Women's Jogger M", ["men's"]) is None
+
 # ── Full match_item ──
 
 _PAT = Target(brand="Patagonia", aliases=["Patagonia"], sizes=["XL", "X-Large", "Extra Large"],

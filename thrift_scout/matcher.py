@@ -60,7 +60,11 @@ def match_size(title: str, sizes: list[str]) -> str | None:
 
 def check_exclusions(title: str, exclusions: list[str]) -> str | None:
     tl = title.lower()
-    return next((e for e in exclusions if e.lower() in tl), None)
+    return next(
+        (e for e in exclusions
+         if re.search(rf'\b{re.escape(e.lower())}\b', tl)),
+        None,
+    )
 
 
 def match_username(username: str, obfuscated_name: str) -> bool:
