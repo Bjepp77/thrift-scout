@@ -312,6 +312,8 @@ def _execute(config: Config, preview_html: str | None) -> None:
             # Compose + send email for this profile.
             # Bids are tied to the SGW account — only show to the first profile.
             profile_bids = active_bids if profile == config.profiles[0] else []
+            brands_summary = ", ".join(f"{b}({len(v)})" for b, v in matches.items()) or "none"
+            print(f"[{profile.name}] Matches: {brands_summary} | Bids: {len(profile_bids)}")
             html, subject = None, ""
             if matches or profile_bids:
                 html = render_report(matches, active_bids=profile_bids)
