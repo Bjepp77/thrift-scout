@@ -14,12 +14,6 @@ profiles:
         gender: "mens"
         exclude: ["kids", "youth"]
 
-      - brand: "Dr. Martens"
-        aliases: ["Dr. Martens", "Dr Martens", "Doc Martens", "Docs", "DM's"]
-        sizes: ["11", "11M", "Mens 11", "US 11"]
-        gender: "mens"
-        exclude: ["kids", "youth", "womens 11"]
-
       - brand: "Blundstone"
         aliases: ["Blundstone", "Blundstones", "Blunnies"]
         sizes: ["11.5", "11 1/2", "US 11.5"]
@@ -50,17 +44,69 @@ profiles:
         gender: "mens"
         exclude: ["kids", "youth", "womens"]
 
-      - brand: "Brooks Brothers"
-        aliases: ["Brooks Brothers", "Brooks Bros"]
-        sizes: ["XL", "X-Large", "Extra Large"]
-        gender: "mens"
-        exclude: ["kids", "youth", "womens"]
-
       - brand: "Omega x Swatch"
         aliases: ["Omega x Swatch", "Omega Swatch", "MoonSwatch", "Moon Swatch", "Bioceramic Moonswatch"]
         sizes: []
         match_mode: "keyword_pair"
         exclude: ["strap only", "band only", "box only", "replica", "fake", "homage"]
+
+      - brand: "Seiko Watch"
+        aliases: ["Seiko"]
+        sizes: []
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken"]
+
+      - brand: "Tissot Watch"
+        aliases: ["Tissot"]
+        sizes: []
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken"]
+
+      - brand: "Hamilton Watch"
+        aliases: ["Hamilton"]
+        sizes: []
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "hamilton beach"]
+
+      - brand: "Montblanc Watch"
+        aliases: ["Montblanc", "Mont Blanc"]
+        sizes: []
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken"]
+
+      - brand: "Breitling Watch"
+        aliases: ["Breitling"]
+        sizes: []
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken"]
+
+      - brand: "IWC Watch"
+        aliases: ["IWC", "International Watch Co"]
+        sizes: []
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken"]
+
+      - brand: "Omega Watch"
+        aliases: ["Omega"]
+        sizes: []
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "swatch", "moonswatch"]
+
+      - brand: "Vans UltraRange"
+        aliases: ["UltraRange", "Ultra Range", "Ultrarange"]
+        sizes: ["12", "US 12", "Mens 12"]
+        gender: "mens"
+        exclude: ["kids", "youth", "womens 12"]
+
+      - brand: "Sendero"
+        aliases: ["Sendero"]
+        sizes: ["XL", "X-Large", "Extra Large"]
+        gender: "mens"
+        exclude: ["kids", "youth", "womens"]
+
+      - brand: "Sendero Hat"
+        aliases: ["Sendero"]
+        sizes: []
+        exclude: ["kids", "youth"]
+
+      - brand: "Denim Jacket"
+        aliases: ["Denim Jacket", "Jean Jacket", "Trucker Jacket"]
+        sizes: ["XL", "X-Large", "Extra Large"]
+        gender: "mens"
+        exclude: ["kids", "youth", "womens", "girls", "boys"]
 
   - name: Alysha
     email: alysha.edwards97@gmail.com
