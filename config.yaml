@@ -50,12 +50,6 @@ profiles:
         match_mode: "keyword_pair"
         exclude: ["strap only", "band only", "box only", "replica", "fake", "homage"]
 
-      - brand: "Seiko Watch"
-        aliases: ["Seiko"]
-        sizes: []
-        gender: "mens"
-        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
-
       - brand: "Tissot Watch"
         aliases: ["Tissot"]
         sizes: []
@@ -85,12 +79,6 @@ profiles:
         sizes: []
         gender: "mens"
         exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
-
-      - brand: "Omega Watch"
-        aliases: ["Omega"]
-        sizes: []
-        gender: "mens"
-        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "swatch", "moonswatch", "ladies", "lady's", "lady", "woman's", "woman"]
 
       - brand: "Vans UltraRange"
         aliases: ["UltraRange", "Ultra Range", "Ultrarange"]
