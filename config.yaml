@@ -53,37 +53,44 @@ profiles:
       - brand: "Seiko Watch"
         aliases: ["Seiko"]
         sizes: []
-        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken"]
+        gender: "mens"
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
 
       - brand: "Tissot Watch"
         aliases: ["Tissot"]
         sizes: []
-        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken"]
+        gender: "mens"
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
 
       - brand: "Hamilton Watch"
         aliases: ["Hamilton"]
         sizes: []
-        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "hamilton beach"]
+        gender: "mens"
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "hamilton beach", "ladies", "lady's", "lady", "woman's", "woman"]
 
       - brand: "Montblanc Watch"
         aliases: ["Montblanc", "Mont Blanc"]
         sizes: []
-        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken"]
+        gender: "mens"
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
 
       - brand: "Breitling Watch"
         aliases: ["Breitling"]
         sizes: []
-        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken"]
+        gender: "mens"
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
 
       - brand: "IWC Watch"
         aliases: ["IWC", "International Watch Co"]
         sizes: []
-        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken"]
+        gender: "mens"
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
 
       - brand: "Omega Watch"
         aliases: ["Omega"]
         sizes: []
-        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "swatch", "moonswatch"]
+        gender: "mens"
+        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "swatch", "moonswatch", "ladies", "lady's", "lady", "woman's", "woman"]
 
       - brand: "Vans UltraRange"
         aliases: ["UltraRange", "Ultra Range", "Ultrarange"]
