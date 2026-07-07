@@ -56,12 +56,6 @@ profiles:
         gender: "mens"
         exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
 
-      - brand: "Hamilton Watch"
-        aliases: ["Hamilton"]
-        sizes: []
-        gender: "mens"
-        exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "hamilton beach", "ladies", "lady's", "lady", "woman's", "woman"]
-
       - brand: "Montblanc Watch"
         aliases: ["Montblanc", "Mont Blanc"]
         sizes: []
