@@ -100,64 +100,64 @@ profiles:
       # ── Kids shoes: girls size 5 ──
       - brand: "Nike Girls Shoes"
         aliases: ["Nike"]
-        sizes: ["5", "5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
-        exclude: ["5.5", "boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
+        exclude: ["boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
       - brand: "Adidas Girls Shoes"
         aliases: ["Adidas"]
-        sizes: ["5", "5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
-        exclude: ["5.5", "boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
+        exclude: ["boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
       - brand: "Vans Girls Shoes"
         aliases: ["Vans"]
-        sizes: ["5", "5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
-        exclude: ["5.5", "boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
+        exclude: ["boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
       - brand: "New Balance Girls Shoes"
         aliases: ["New Balance"]
-        sizes: ["5", "5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
-        exclude: ["5.5", "boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
+        exclude: ["boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
       - brand: "Converse Girls Shoes"
         aliases: ["Converse"]
-        sizes: ["5", "5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
-        exclude: ["5.5", "boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
+        exclude: ["boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
       - brand: "Jordan Girls Shoes"
         aliases: ["Jordan"]
-        sizes: ["5", "5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
-        exclude: ["5.5", "boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["5Y", "Youth 5", "Big Kid 5", "Little Kid 5"]
+        exclude: ["boys", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
       # ── Kids shoes: boys size 9 ──
       - brand: "Nike Boys Shoes"
         aliases: ["Nike"]
-        sizes: ["9", "9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
-        exclude: ["9.5", "girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
+        exclude: ["girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
       - brand: "Adidas Boys Shoes"
         aliases: ["Adidas"]
-        sizes: ["9", "9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
-        exclude: ["9.5", "girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
+        exclude: ["girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
       - brand: "Vans Boys Shoes"
         aliases: ["Vans"]
-        sizes: ["9", "9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
-        exclude: ["9.5", "girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
+        exclude: ["girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
       - brand: "New Balance Boys Shoes"
         aliases: ["New Balance"]
-        sizes: ["9", "9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
-        exclude: ["9.5", "girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
+        exclude: ["girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
       - brand: "Converse Boys Shoes"
         aliases: ["Converse"]
-        sizes: ["9", "9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
-        exclude: ["9.5", "girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
+        exclude: ["girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
       - brand: "Jordan Boys Shoes"
         aliases: ["Jordan"]
-        sizes: ["9", "9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
-        exclude: ["9.5", "girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
+        sizes: ["9Y", "Youth 9", "Big Kid 9", "Little Kid 9"]
+        exclude: ["girls", "mens", "womens", "ladies", "lot", "bundle", "damaged", "stained"]
 
   - name: Alysha
     email: alysha.edwards97@gmail.com

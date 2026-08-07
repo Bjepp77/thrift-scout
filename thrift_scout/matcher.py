@@ -31,10 +31,15 @@ _GENDER_EXCL = {
 @lru_cache(maxsize=256)
 def _size_re(s: str) -> re.Pattern[str]:
     e = re.escape(s)
-    if re.match(r"^\d+([./]\d+)?$", s):
-        return re.compile(rf"(?<!\d){e}(?!\d)", re.I)
     if re.match(r"^[A-Za-z]{1,3}$", s):
         return re.compile(rf"(?<![A-Za-z]){e}(?![A-Za-z])", re.I)
+    if any(c.isdigit() for c in s):
+        # Guard against a decimal point as well as a digit on either side.
+        # A bare \d guard is not enough: "." is not a digit, so size "5"
+        # happily matched the tail of "Size 6.5" / "4.5" / "2.5" / "7.5",
+        # and size "9" matched the head of "9.5Y". That single gap produced
+        # 64 wrong matches out of 77 on the kids-shoe targets in two days.
+        return re.compile(rf"(?<![\d.]){e}(?![\d.])", re.I)
     return re.compile(rf"\b{e}\b", re.I)
 
 
