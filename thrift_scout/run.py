@@ -36,6 +36,54 @@ def _record(item: dict, brand: str, info: dict) -> dict:
     }
 
 
+_REQUIRED_ITEM_FIELDS = ("itemId", "title", "endTime")
+
+
+def _cap_matches(matches: dict[str, list[dict]], cap: int) -> tuple[dict[str, list[dict]], int]:
+    """Trim a digest to the `cap` most urgent items, keeping brand grouping.
+
+    Returns the trimmed mapping and how many were held back. Only what is
+    returned here gets emailed, persisted and watchlisted, so anything held
+    back stays unseen and reappears in the next scan rather than being lost.
+    """
+    total = sum(len(v) for v in matches.values())
+    if cap <= 0 or total <= cap:
+        return matches, 0
+    flat = [(brand, item) for brand, items in matches.items() for item in items]
+    flat.sort(key=lambda bi: bi[1]["end_time"])   # soonest to end is most urgent
+    kept: dict[str, list[dict]] = {}
+    for brand, item in flat[:cap]:
+        kept.setdefault(brand, []).append(item)
+    return kept, total - cap
+
+
+def _contract_errors(cache: dict, search_count: int) -> list[str]:
+    """Detect a ShopGoodwill response-shape change instead of reporting silence.
+
+    Every API test in this repo uses fakes, so a renamed field would leave the
+    suite green while the scan quietly matched nothing. With `send_empty_email`
+    on, that failure looks exactly like a normal quiet day and could run for
+    weeks unnoticed. These checks make it loud.
+    """
+    problems: list[str] = []
+    total_items = sum(len(v) for v in cache.values())
+    if search_count and total_items == 0:
+        problems.append(
+            f"No results from any of {search_count} searches. A normal scan returns "
+            f"roughly a thousand. Likely an API contract change, a block, or auth loss."
+        )
+        return problems
+    sample = next((v[0] for v in cache.values() if v), None)
+    if sample is not None:
+        missing = [f for f in _REQUIRED_ITEM_FIELDS if f not in sample]
+        if missing:
+            problems.append(
+                f"Search results are missing expected field(s) {', '.join(missing)}. "
+                f"ShopGoodwill's response shape has probably changed."
+            )
+    return problems
+
+
 def _check_active_bids(api: ShopGoodwillAPI, errors: list[str]) -> list[dict]:
     """Fetch active bids, preferring the dedicated endpoint over favorites."""
 
@@ -256,6 +304,12 @@ def _execute(config: Config, preview_html: str | None) -> None:
                 log.error(msg, exc_info=True)
                 cache[(term, cat)] = []
 
+        # ── Phase 1b: does the API still look like the API? ──
+        for problem in _contract_errors(cache, len(search_keys)):
+            print(f"[contract] {problem}")
+            log.error(problem)
+            errors.append(problem)
+
         # ── Phase 2: fork results per profile ──
         all_watchlist_ids: set[int] = set()
 
@@ -266,9 +320,21 @@ def _execute(config: Config, preview_html: str | None) -> None:
             try:
                 seen_db, seen_titles = store.get_seen(profile.name)
             except Exception as exc:
+                # Fail closed. Treating everything as new used to be the
+                # fallback, but a scan sees ~1000 items, so that is a
+                # thousand-row email rather than "a few duplicates" — and once
+                # delivered they would all be marked seen and suppressed
+                # forever. Skipping the profile costs one day and loses nothing.
                 log.warning("Dedup unavailable for %s: %s", profile.name, exc)
-                errors.append(f"Dedup unavailable for {profile.name} — all items treated as new")
-                seen_db, seen_titles = set(), set()
+                msg = (f"Dedup unavailable for {profile.name} ({type(exc).__name__}). "
+                       f"Skipped this profile rather than sending every listing as new. "
+                       f"Nothing was marked seen, so the next scan picks up where this left off.")
+                errors.append(msg)
+                print(f"[{profile.name}] SKIPPED — dedup unavailable")
+                if not preview_html:
+                    send_email("Thrift Scout: Scan skipped (dedup unavailable)",
+                               render_error_report([msg]), config, profile.email)
+                continue
 
             matches: dict[str, list[dict]] = {}
             p_found = p_new = 0
@@ -307,6 +373,14 @@ def _execute(config: Config, preview_html: str | None) -> None:
                     matches[target.brand] = hits
                     p_new += len(hits)
 
+            # Honour the configured digest cap. It was declared in config and
+            # never read, so a 93-item flood went out under a 50-item setting.
+            matches, deferred = _cap_matches(matches, config.max_items_per_email)
+            if deferred:
+                p_new -= deferred
+                print(f"[{profile.name}] Capped at {config.max_items_per_email}; "
+                      f"{deferred} held for the next scan.")
+
             total_found += p_found
             total_new += p_new
 
@@ -325,6 +399,12 @@ def _execute(config: Config, preview_html: str | None) -> None:
                 # matched looked completely healthy. Degraded is not success.
                 if errors:
                     html = prepend_error_banner(html, errors)
+                if deferred:
+                    html = prepend_error_banner(html, [
+                        f"Showing the {config.max_items_per_email} soonest-ending items. "
+                        f"{deferred} more matched and are held for the next scan; "
+                        f"they have not been marked seen."
+                    ])
                 parts = []
                 if p_new:
                     parts.append(f"{p_new} new item{'s' if p_new != 1 else ''}")
