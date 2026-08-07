@@ -77,6 +77,16 @@ class Store:
         )
         resp.raise_for_status()
 
+    def log_near_misses(self, rows: list[dict]) -> None:
+        """Record listings a target almost took, for recall review."""
+        if not rows:
+            return
+        try:
+            resp = self._client.post(f"{self._base}/near_misses", json=rows)
+            resp.raise_for_status()
+        except Exception as exc:
+            log.warning("Near-miss log failed (non-critical): %s", exc)
+
     def purge_old(self, days: int = _PURGE_DAYS) -> None:
         try:
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()

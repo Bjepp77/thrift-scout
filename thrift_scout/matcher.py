@@ -136,30 +136,45 @@ def match_username(username: str, obfuscated_name: str) -> bool:
     )
 
 
-def match_item(item: dict, target: Target) -> dict[str, str] | None:
+def evaluate(item: dict, target: Target) -> tuple[dict[str, str] | None, str]:
+    """Match an item, and say why when it fails.
+
+    The reason is what makes recall measurable. `seen_items` only ever records
+    what matched, so replaying it proves precision and is silent about misses.
+    A listing rejected here for `size` while its brand matched is the highest
+    value signal available: right item, wrong verdict.
+
+    Brand is checked before exclusions purely so the reason is informative;
+    both orderings reject exactly the same set, since an item with no brand
+    match is dropped either way.
+    """
     title = item.get("title", "")
+
+    brand = match_brand(title, target.aliases)
+    if not brand:
+        return None, "brand"
+
     excl = (target.exclude
             + _GENDER_EXCL.get(target.gender.lower().strip(), [])
             + _LOT_EXCL)
-
-    if check_exclusions(title, excl):
-        return None
+    if hit := check_exclusions(title, excl):
+        return None, f"excluded:{hit}"
 
     if target.max_price is not None:
         try:
             if float(item.get("currentPrice") or item.get("minimumBid") or 0) > target.max_price:
-                return None
+                return None, "price"
         except (TypeError, ValueError):
             pass
 
-    brand = match_brand(title, target.aliases)
-    if not brand:
-        return None
-
     if target.match_mode in ("keyword_pair", "brand_only"):
-        return {"brand_matched": brand, "size_matched": "", "match_mode": target.match_mode}
+        return {"brand_matched": brand, "size_matched": "", "match_mode": target.match_mode}, ""
 
     size = match_size(title, target.sizes)
     if size is None:
-        return None
-    return {"brand_matched": brand, "size_matched": size, "match_mode": "brand_size"}
+        return None, "size"
+    return {"brand_matched": brand, "size_matched": size, "match_mode": "brand_size"}, ""
+
+
+def match_item(item: dict, target: Target) -> dict[str, str] | None:
+    return evaluate(item, target)[0]

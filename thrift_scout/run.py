@@ -9,7 +9,7 @@ from thrift_scout.email_report import (
     prepend_error_banner, render_empty_report, render_error_report, render_report,
     send_email,
 )
-from thrift_scout.matcher import match_item, match_username, norm_title
+from thrift_scout.matcher import evaluate, match_username, norm_title
 from thrift_scout.store import Store
 
 log = logging.getLogger(__name__)
@@ -254,6 +254,7 @@ def run(config_path: str = "config.yaml", preview_html: str | None = None) -> No
 
 def _execute(config: Config, preview_html: str | None) -> None:
     errors: list[str] = []
+    near_misses: list[dict] = []
     total_found = total_new = watchlisted = 0
 
     with ShopGoodwillAPI(config.request_delay_min, config.request_delay_max) as api, \
@@ -362,11 +363,23 @@ def _execute(config: Config, preview_html: str | None) -> None:
                         nt = norm_title(item.get("title", ""))
                         if nt and (nt in seen_titles or nt in run_titles):
                             continue
-                        if info := match_item(item, target):
+                        info, why = evaluate(item, target)
+                        if info:
                             run_ids.add(iid)
                             if nt:
                                 run_titles.add(nt)
                             hits.append(_record(item, target.brand, info))
+                        elif why != "brand" and len(near_misses) < config.max_near_misses:
+                            # Brand matched but something else rejected it. This
+                            # is the only record of what the matcher throws away,
+                            # and the only way to catch a rule that is too tight.
+                            near_misses.append({
+                                "profile": profile.name,
+                                "target": target.brand,
+                                "item_id": iid,
+                                "title": item.get("title", "")[:500],
+                                "reason": why,
+                            })
 
                 if hits:
                     hits.sort(key=lambda x: x["end_time"])
@@ -466,6 +479,10 @@ def _execute(config: Config, preview_html: str | None) -> None:
                     errors.append(f"Watchlist failed: {iid}")
 
         store.log_run(total_found, total_new, watchlisted, errors)
-        store.purge_old()
+        store.log_near_misses(near_misses)
+        # 0 means never forget. Purging is what made a relist look new.
+        if config.seen_retention_days > 0:
+            store.purge_old(config.seen_retention_days)
         print(f"\n[done] Found={total_found}  New={total_new}  "
-              f"Watchlisted={watchlisted}  Errors={len(errors)}")
+              f"Watchlisted={watchlisted}  NearMiss={len(near_misses)}  "
+              f"Errors={len(errors)}")

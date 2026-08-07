@@ -64,6 +64,15 @@ class Config(BaseModel):
     send_empty_email: bool = True
     page_size: int = 40
     max_pages: int = 5
+    # Days of "already reported" memory. 0 means never forget, which is the
+    # point: a purged row is a listing the next relist reports as new again.
+    # The old 30-day purge was deleting ~150 rows a week and saving nothing —
+    # the table is under 500 kB for a month of history, roughly 5 MB a year
+    # against a 500 MB tier. Set a positive value only to reclaim space.
+    seen_retention_days: int = 0
+    # Cap on near-miss rows recorded per run, so a matcher regression cannot
+    # turn a diagnostic into thousands of inserts.
+    max_near_misses: int = 300
 
 
 def load_config(path: str = "config.yaml") -> Config:

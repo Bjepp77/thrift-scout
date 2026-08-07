@@ -18,6 +18,7 @@ class _FakeStore:
     def __exit__(self, *a): pass
     def get_seen(self, profile): return set(), set()
     def mark_batch_seen(self, profile, items): self.marked.append((profile, items))
+    def log_near_misses(self, rows): pass
     def purge_old(self, days=30): pass
     def log_run(self, f, n, w, e): self.logged = (f, n, w, e)
 
