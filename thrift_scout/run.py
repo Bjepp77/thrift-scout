@@ -8,7 +8,7 @@ from thrift_scout.config import Config, load_config
 from thrift_scout.email_report import (
     render_empty_report, render_error_report, render_report, send_email,
 )
-from thrift_scout.matcher import match_item, match_username
+from thrift_scout.matcher import match_item, match_username, norm_title
 from thrift_scout.store import Store
 
 log = logging.getLogger(__name__)
@@ -263,14 +263,20 @@ def _execute(config: Config, preview_html: str | None) -> None:
             # as new rather than crashing — user sees duplicates instead
             # of missing items entirely.
             try:
-                seen_db = store.get_seen_ids(profile.name)
+                seen_db, seen_titles = store.get_seen(profile.name)
             except Exception as exc:
                 log.warning("Dedup unavailable for %s: %s", profile.name, exc)
                 errors.append(f"Dedup unavailable for {profile.name} — all items treated as new")
-                seen_db = set()
+                seen_db, seen_titles = set(), set()
 
             matches: dict[str, list[dict]] = {}
             p_found = p_new = 0
+            # Profile-wide, so one listing cannot be reported twice in the same
+            # digest. `dedup` below resets per target, which let an item that
+            # matched two overlapping targets (a Jordan shoe matches both the
+            # Nike and the Jordan target) appear under both brand headings.
+            run_ids: set[int] = set()
+            run_titles: set[str] = set()
 
             for target in profile.targets:
                 terms = target.aliases if target.match_mode == "keyword_pair" else [target.brand]
@@ -284,9 +290,15 @@ def _execute(config: Config, preview_html: str | None) -> None:
                             continue
                         dedup.add(iid)
                         p_found += 1
-                        if iid in seen_db:
+                        if iid in seen_db or iid in run_ids:
+                            continue
+                        nt = norm_title(item.get("title", ""))
+                        if nt and (nt in seen_titles or nt in run_titles):
                             continue
                         if info := match_item(item, target):
+                            run_ids.add(iid)
+                            if nt:
+                                run_titles.add(nt)
                             hits.append(_record(item, target.brand, info))
 
                 if hits:

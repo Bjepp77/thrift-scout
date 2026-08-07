@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
+from thrift_scout.matcher import norm_title as _norm
+
 log = logging.getLogger(__name__)
 _PURGE_DAYS = 30
 
@@ -33,15 +35,25 @@ class Store:
     def __exit__(self, *_: object) -> None:
         self._client.close()
 
-    def get_seen_ids(self, profile: str) -> set[int]:
+    def get_seen(self, profile: str) -> tuple[set[int], set[str]]:
+        """Return the ids and the titles already reported to this profile.
+
+        Titles matter because ShopGoodwill relists unsold lots weekly under a
+        new itemId, so an id-only check reports the same thing as new again.
+        Both come from one request; splitting them would double the round trip.
+        """
         # Explicit limit — PostgREST silently truncates at 1000 rows by
         # default, which would cause false "new" items as the DB grows.
         resp = self._client.get(
             f"{self._base}/seen_items",
-            params={"select": "item_id", "profile": f"eq.{profile}", "limit": "100000"},
+            params={"select": "item_id,title", "profile": f"eq.{profile}", "limit": "100000"},
         )
         resp.raise_for_status()
-        return {r["item_id"] for r in resp.json()}
+        rows = resp.json()
+        return (
+            {r["item_id"] for r in rows},
+            {_norm(r["title"]) for r in rows if r.get("title")},
+        )
 
     def mark_batch_seen(self, profile: str, items: list[dict]) -> None:
         if not items:

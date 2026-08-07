@@ -52,6 +52,20 @@ def _expand_sizes(sizes: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(out)
 
 
+_WS = re.compile(r"\s+")
+
+
+def norm_title(title: str) -> str:
+    """Canonical form of a listing title, used to spot the same thing twice.
+
+    ShopGoodwill relists unsold lots on a weekly cycle and each relist gets a
+    fresh itemId, so id-only dedup reports the same item as new every week.
+    Roughly a quarter of everything stored had been reported before under a
+    different id.
+    """
+    return _WS.sub(" ", title.strip().lower())
+
+
 def match_brand(title: str, aliases: list[str]) -> str | None:
     tl = title.lower()
     return next((a for a in aliases if a.lower() in tl), None)

@@ -1,6 +1,8 @@
 """Unit tests for the matching engine and bid-detection helpers."""
 from thrift_scout.config import Target
-from thrift_scout.matcher import check_exclusions, match_brand, match_item, match_size, match_username
+from thrift_scout.matcher import (
+    check_exclusions, match_brand, match_item, match_size, match_username, norm_title,
+)
 
 # ── Brand ──
 
@@ -185,3 +187,44 @@ def test_boys_9_rejects_model_numbers_and_child_widths():
 
 def test_boys_9_accepts_real_youth_nine():
     assert match_item({"title": "Jordan Boys Big Kid 9 Sneakers"}, _BOYS_9)
+
+
+# ── Toddler sizing (2026-08-06) ──
+#
+# The kids targets are for a 1-year-old and a 3-year-old, so they need US
+# toddler sizing ("5C", "9C"), not youth ("5Y", "9Y", ages ~10-13). An earlier
+# pass read "kids" as youth and filtered out 9C as if it were the wrong size.
+
+_TODDLER_5 = Target(brand="Nike Girls Shoes", aliases=["Nike"],
+                    sizes=["5C", "Toddler 5", "5 Toddler", "Baby 5", "Infant 5"],
+                    exclude=["boys", "mens", "womens", "ladies", "youth", "big kid", "5Y"])
+_TODDLER_9 = Target(brand="Jordan Boys Shoes", aliases=["Jordan"],
+                    sizes=["9C", "Toddler 9", "9 Toddler", "Baby 9", "Infant 9"],
+                    exclude=["girls", "mens", "womens", "ladies", "youth", "big kid", "9Y"])
+
+
+def test_toddler_9c_is_a_wanted_match():
+    assert match_item(
+        {"title": "Nike Baby Boys Air Jordan Zion 1 DC2023-004 Blue Black Sneakers Shoes Size 9C"},
+        _TODDLER_9)
+
+
+def test_toddler_targets_reject_youth_sizes():
+    assert match_item({"title": "Nike Girls Shoes Size 5Y"}, _TODDLER_5) is None
+    assert match_item({"title": "Jordan Boys Big Kid 9 Sneakers"}, _TODDLER_9) is None
+
+
+def test_toddler_size_does_not_match_across_decimal():
+    assert match_item({"title": "Nike Girls Sneakers Size 6.5C"}, _TODDLER_5) is None
+    assert match_item({"title": "Nike Girls Sneakers Size 15C"}, _TODDLER_5) is None
+
+
+# ── Title normalisation for relist dedup ──
+
+def test_norm_title_collapses_case_and_whitespace():
+    assert norm_title("  Nike   Girls  Shoes ") == "nike girls shoes"
+    assert norm_title("VUORI Leggings") == norm_title("vuori   leggings")
+
+
+def test_norm_title_distinguishes_genuinely_different_titles():
+    assert norm_title("Patagonia XL Fleece") != norm_title("Patagonia XL Shorts")
