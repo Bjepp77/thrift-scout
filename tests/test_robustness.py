@@ -100,3 +100,45 @@ def test_error_banner_escapes_too():
     out = prepend_error_banner("<html><body></body></html>", ["<img src=x>"])
     assert "<img src=x>" not in out
     assert "&lt;img" in out
+
+
+# ── Supabase credential selection ──
+
+def test_service_key_is_preferred_over_anon(monkeypatch):
+    from thrift_scout.store import Store
+    monkeypatch.setenv("SUPABASE_URL", "https://x.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-value")
+    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "service-value")
+    s = Store()
+    assert s.using_service_key
+    assert s._headers["apikey"] == "service-value"
+
+
+def test_anon_key_still_works_as_fallback(monkeypatch):
+    from thrift_scout.store import Store
+    monkeypatch.setenv("SUPABASE_URL", "https://x.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-value")
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+    s = Store()
+    assert not s.using_service_key
+    assert s._headers["apikey"] == "anon-value"
+
+
+def test_missing_both_keys_is_a_clear_error(monkeypatch):
+    from thrift_scout.store import Store
+    monkeypatch.setenv("SUPABASE_URL", "https://x.supabase.co")
+    monkeypatch.delenv("SUPABASE_ANON_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="SUPABASE_SERVICE_KEY"):
+        Store()
+
+
+def test_key_value_is_never_logged(monkeypatch, caplog):
+    import logging
+    from thrift_scout.store import Store
+    monkeypatch.setenv("SUPABASE_URL", "https://x.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "super-secret-value")
+    with caplog.at_level(logging.INFO):
+        Store()
+    assert "super-secret-value" not in caplog.text
+    assert "service key" in caplog.text

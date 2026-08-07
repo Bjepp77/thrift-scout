@@ -17,9 +17,20 @@ class Store:
 
     def __init__(self) -> None:
         url = os.environ.get("SUPABASE_URL", "")
-        key = os.environ.get("SUPABASE_ANON_KEY", "")
+        # Prefer the service key. This is a server-side cron job with no browser
+        # client, so there is no reason to authenticate as `anon` — a role whose
+        # whole security model assumes RLS constrains it. The service key
+        # bypasses RLS, which lets `public` be denied outright: a leaked anon key
+        # then grants nothing. ANON is kept as a fallback so the secret can be
+        # swapped in GitHub without a flag-day deploy.
+        key = os.environ.get("SUPABASE_SERVICE_KEY", "") or os.environ.get("SUPABASE_ANON_KEY", "")
         if not url or not key:
-            raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be set")
+            raise RuntimeError(
+                "SUPABASE_URL and one of SUPABASE_SERVICE_KEY / SUPABASE_ANON_KEY must be set"
+            )
+        self.using_service_key = bool(os.environ.get("SUPABASE_SERVICE_KEY"))
+        # Never log the key itself, only which one is in play.
+        log.info("Supabase auth: %s", "service key" if self.using_service_key else "anon key")
         self._base = f"{url.rstrip('/')}/rest/v1"
         self._headers = {
             "apikey": key,
