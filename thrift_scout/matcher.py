@@ -23,16 +23,30 @@ for _aliases in SIZE_ALIASES.values():
         _REV[_a.upper()] = _s
 
 _GENDER_EXCL = {
-    "mens": ["women's", "womens", "women"],
-    "womens": ["men's", "mens"],
+    "mens": ["women's", "womens", "women", "ladies", "lady's", "girls"],
+    # Bare "men" was missing, so "vuori ... jacket men size M" landed in a
+    # womens digest. It is safe to add: exclusions match on word boundaries,
+    # and the "men" inside "women" has no boundary before it.
+    "womens": ["men's", "mens", "men", "boys"],
 }
+
+# Multi-item lots are never what a size-specific target is looking for, and
+# sellers write them a dozen ways: "Lot of 3", "3 Item Lot|", "Lot Watches",
+# "7pc ... Lot". Bare "lot" catches them all and is safe because exclusions
+# match on word boundaries, so "Camelot" and "pilot" do not trip it. Bare
+# "set" is deliberately absent: a two-piece set can be a legitimate find.
+_LOT_EXCL = ["lot", "bundle"]
 
 
 @lru_cache(maxsize=256)
 def _size_re(s: str) -> re.Pattern[str]:
     e = re.escape(s)
     if re.match(r"^[A-Za-z]{1,3}$", s):
-        return re.compile(rf"(?<![A-Za-z]){e}(?![A-Za-z])", re.I)
+        # Block an adjacent digit as well as an adjacent letter. A leading
+        # digit is what separates XL from 2XL and 3XL, and SIZE_ALIASES
+        # already treats those as XXL and XXXL — the guard just never
+        # enforced it, so every XL target quietly collected 2XL and 3XL.
+        return re.compile(rf"(?<![A-Za-z\d]){e}(?![A-Za-z\d])", re.I)
     if any(c.isdigit() for c in s):
         # Guard against a decimal point as well as a digit on either side.
         # A bare \d guard is not enough: "." is not a digit, so size "5"
@@ -66,9 +80,17 @@ def norm_title(title: str) -> str:
     return _WS.sub(" ", title.strip().lower())
 
 
+@lru_cache(maxsize=256)
+def _alias_re(a: str) -> re.Pattern[str]:
+    # A plain substring test let "Mathey-Tissot" satisfy the "Tissot" target,
+    # and \b would not have helped: a hyphen is a word boundary. Require that
+    # neither side is a word character *or* a hyphen, so hyphenated compound
+    # brands stay distinct while "TISSOT 534657" still matches.
+    return re.compile(rf"(?<![\w-]){re.escape(a)}(?![\w-])", re.I)
+
+
 def match_brand(title: str, aliases: list[str]) -> str | None:
-    tl = title.lower()
-    return next((a for a in aliases if a.lower() in tl), None)
+    return next((a for a in aliases if _alias_re(a).search(title)), None)
 
 
 def match_size(title: str, sizes: list[str]) -> str | None:
@@ -116,7 +138,9 @@ def match_username(username: str, obfuscated_name: str) -> bool:
 
 def match_item(item: dict, target: Target) -> dict[str, str] | None:
     title = item.get("title", "")
-    excl = target.exclude + _GENDER_EXCL.get(target.gender.lower().strip(), [])
+    excl = (target.exclude
+            + _GENDER_EXCL.get(target.gender.lower().strip(), [])
+            + _LOT_EXCL)
 
     if check_exclusions(title, excl):
         return None

@@ -228,3 +228,58 @@ def test_norm_title_collapses_case_and_whitespace():
 
 def test_norm_title_distinguishes_genuinely_different_titles():
     assert norm_title("Patagonia XL Fleece") != norm_title("Patagonia XL Shorts")
+
+
+# ── Precision fixes found by auditing a live run (2026-08-07) ──
+#
+# The first production run on the hardened code delivered a digest containing
+# 2XL shirts, a Mathey-Tissot watch, a mens jacket in a womens digest, and
+# several multi-item lots. All four are older bugs the earlier replay could
+# not surface, because that replay only proved behaviour was *unchanged*.
+
+def test_xl_does_not_match_2xl_or_3xl():
+    for t in ["Patagonia Shirt Size 2XL", "Kuhl Shirt size 3XL", "Fleece XXL"]:
+        assert match_size(t, ["XL"]) is None, t
+
+
+def test_xl_still_matches_its_own_forms():
+    assert match_size("Patagonia Fleece Size XL", ["XL"])
+    assert match_size("Patagonia Fleece X-Large", ["XL"])
+    assert match_size("Patagonia Fleece 1XL", ["XL"])   # 1XL is an XL alias
+
+
+def test_alias_does_not_match_a_hyphenated_compound_brand():
+    # \b alone would not catch this: a hyphen is a word boundary.
+    assert match_brand("Authentic Mathey-Tissot Watch", ["Tissot"]) is None
+    assert match_brand("Mathey Tissot", ["Mathey-Tissot"]) is None
+
+
+def test_alias_still_matches_normally():
+    assert match_brand("Vintage 14k Gold TISSOT 534657 Pocket Watch", ["Tissot"]) == "Tissot"
+    assert match_brand("KUHL Wildfibre Mens XL", ["KUHL"]) == "KUHL"
+    assert match_brand("New Balance Girls Shoes", ["New Balance"]) == "New Balance"
+
+
+def test_womens_target_excludes_bare_men():
+    t = Target(brand="Vuori", aliases=["Vuori"], sizes=["M"], gender="womens")
+    assert match_item({"title": "vuori sunday element track jacket men size M"}, t) is None
+    assert match_item({"title": "Vuori Medium Tan Pants Men"}, t) is None
+
+
+def test_womens_target_still_matches_women():
+    t = Target(brand="Vuori", aliases=["Vuori"], sizes=["M"], gender="womens")
+    assert match_item({"title": "Vuori Women's Miles Ankle Pant Size M"}, t)
+
+
+def test_lots_are_excluded_everywhere():
+    t = Target(brand="KUHL", aliases=["KUHL"], sizes=["XL"], gender="mens")
+    for title in ["KUHL (Lot of 3) Men's XL Shirts",
+                  "Kuhl Men's XL 4 Item Lot| Vest| Shirt",
+                  "7pc Kuhl Men's XL Lot"]:
+        assert match_item({"title": title}, t) is None, title
+
+
+def test_lot_exclusion_does_not_trip_on_words_containing_lot():
+    t = Target(brand="Patagonia", aliases=["Patagonia"], sizes=["XL"], gender="mens")
+    assert match_item({"title": "Patagonia Slot Canyon Shirt XL"}, t)
+    assert match_item({"title": "Patagonia Pilot Jacket XL"}, t)
