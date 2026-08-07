@@ -85,7 +85,7 @@ def test_match_gender_filter():
     assert match_item({"title": "Patagonia Women's Fleece XL", "itemId": 8}, _PAT) is None
 
 def test_price_cap():
-    t = Target(brand="Test", aliases=["Test"], sizes=[], max_price=25.0)
+    t = Target(brand="Test", aliases=["Test"], sizes=[], match_mode="brand_only", max_price=25.0)
     assert match_item({"title": "Test Item", "currentPrice": 30.0, "itemId": 6}, t) is None
     assert match_item({"title": "Test Item", "currentPrice": 20.0, "itemId": 7}, t) is not None
 

@@ -5,9 +5,20 @@ on:
     - cron: "0 14 * * *"   # 7:00 AM Mountain Time (UTC-7)
   workflow_dispatch:        # manual trigger from Actions tab
 
+# A manual run started while the cron run is still going would scan, email and
+# add to the watchlist twice. Queue the second one instead of racing it; never
+# cancel in progress, since a half-finished scan can leave items marked seen.
+concurrency:
+  group: thrift-scout-scan
+  cancel-in-progress: false
+
 jobs:
   scan:
     runs-on: ubuntu-latest
+    # A healthy run takes 4-6 minutes. Without this, a hung request against
+    # ShopGoodwill sits on GitHub's default 6-hour job limit before anyone
+    # notices. 30 gives ample headroom while capping the damage.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v5

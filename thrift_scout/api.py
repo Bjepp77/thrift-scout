@@ -150,12 +150,19 @@ class ShopGoodwillAPI:
                          page_size: int = 40, max_pages: int = 5) -> list[dict]:
         items: list[dict] = []
         for pg in range(1, max_pages + 1):
-            res = self.search(keyword, category_id, pg, page_size).get("searchResults", {})
-            batch = res.get("items", [])
+            res = self.search(keyword, category_id, pg, page_size).get("searchResults") or {}
+            batch = res.get("items") or []
             if not batch:
                 break
             items.extend(batch)
-            if len(items) >= res.get("itemCount", 0):
+            # Only trust itemCount when the API actually sent a positive one.
+            # It used to default to 0, and `len(items) >= 0` is always true, so
+            # a missing field silently capped every search at a single page.
+            total = res.get("itemCount")
+            if isinstance(total, int) and total > 0 and len(items) >= total:
+                break
+            # A short page is the last page.
+            if len(batch) < page_size:
                 break
         return items
 

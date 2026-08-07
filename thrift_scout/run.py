@@ -6,7 +6,8 @@ from pathlib import Path
 from thrift_scout.api import ShopGoodwillAPI
 from thrift_scout.config import Config, load_config
 from thrift_scout.email_report import (
-    render_empty_report, render_error_report, render_report, send_email,
+    prepend_error_banner, render_empty_report, render_error_report, render_report,
+    send_email,
 )
 from thrift_scout.matcher import match_item, match_username, norm_title
 from thrift_scout.store import Store
@@ -305,36 +306,33 @@ def _execute(config: Config, preview_html: str | None) -> None:
                     hits.sort(key=lambda x: x["end_time"])
                     matches[target.brand] = hits
                     p_new += len(hits)
-                    all_watchlist_ids.update(h["item_id"] for h in hits)
 
             total_found += p_found
             total_new += p_new
 
-            # Persist seen items — graceful on failure.
-            for brand, items in matches.items():
-                try:
-                    store.mark_batch_seen(
-                        profile.name,
-                        [{"item_id": i["item_id"], "title": i["title"], "brand": brand} for i in items],
-                    )
-                except Exception as exc:
-                    log.warning("Could not persist seen items for %s/%s: %s", profile.name, brand, exc)
-                    errors.append(f"Seen-items save failed for {profile.name}/{brand}")
-
             # Compose + send email for this profile.
             # Bids are tied to the SGW account — only show to the first profile.
-            profile_bids = active_bids if profile == config.profiles[0] else []
+            # Identity, not equality: two profiles with identical field values
+            # compare equal as pydantic models and would both claim the bids.
+            profile_bids = active_bids if profile is config.profiles[0] else []
             brands_summary = ", ".join(f"{b}({len(v)})" for b, v in matches.items()) or "none"
             print(f"[{profile.name}] Matches: {brands_summary} | Bids: {len(profile_bids)}")
             html, subject = None, ""
             if matches or profile_bids:
                 html = render_report(matches, active_bids=profile_bids)
+                # Errors used to be reported only when there was nothing else to
+                # say, so a run where half the searches failed but a few items
+                # matched looked completely healthy. Degraded is not success.
+                if errors:
+                    html = prepend_error_banner(html, errors)
                 parts = []
                 if p_new:
                     parts.append(f"{p_new} new item{'s' if p_new != 1 else ''}")
                 if profile_bids:
                     parts.append(f"{len(profile_bids)} active bid{'s' if len(profile_bids) != 1 else ''}")
                 subject = f"Thrift Scout: {' + '.join(parts)}"
+                if errors:
+                    subject += f" ({len(errors)} error{'s' if len(errors) != 1 else ''})"
             elif errors:
                 html = render_error_report(errors)
                 subject = "Thrift Scout: Errors during scan"
@@ -342,15 +340,41 @@ def _execute(config: Config, preview_html: str | None) -> None:
                 html = render_empty_report()
                 subject = "Thrift Scout: Nothing new today"
 
+            delivered = False
             if html and preview_html:
                 out = f"{preview_html}.{profile.name}.html"
                 Path(out).write_text(html)
                 print(f"[{profile.name}] Preview -> {out}")
             elif html:
-                ok = send_email(subject, html, config, profile.email)
-                print(f"[{profile.name}] Email {'sent' if ok else 'FAILED'} -> {profile.email}")
+                delivered = send_email(subject, html, config, profile.email)
+                print(f"[{profile.name}] Email {'sent' if delivered else 'FAILED'} -> {profile.email}")
+                if not delivered:
+                    errors.append(f"Email delivery failed for {profile.name}")
             else:
                 print(f"[{profile.name}] Nothing to send.")
+
+            # Persist only what was actually delivered. Marking items seen
+            # before the send meant a failed SMTP call buried them forever:
+            # they were recorded as reported, so the next run skipped them and
+            # the finds were never seen by anyone. Preview runs never persist.
+            if matches and delivered:
+                for brand, items in matches.items():
+                    try:
+                        store.mark_batch_seen(
+                            profile.name,
+                            [{"item_id": i["item_id"], "title": i["title"], "brand": brand}
+                             for i in items],
+                        )
+                    except Exception as exc:
+                        log.warning("Could not persist seen items for %s/%s: %s",
+                                    profile.name, brand, exc)
+                        errors.append(f"Seen-items save failed for {profile.name}/{brand}")
+                all_watchlist_ids.update(
+                    i["item_id"] for items in matches.values() for i in items
+                )
+            elif matches and not preview_html:
+                print(f"[{profile.name}] Not persisting {p_new} item(s) — "
+                      f"undelivered, so they stay eligible for the next run.")
 
         # ── Phase 3: watchlist (shared ShopGoodwill account) ──
         if all_watchlist_ids and authenticated:

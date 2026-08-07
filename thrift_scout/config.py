@@ -4,11 +4,13 @@ import os
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 load_dotenv()
 
 _e = lambda k, d="": Field(default_factory=lambda k=k, d=d: os.getenv(k, d))
+
+_MODES = {"brand_size", "keyword_pair", "brand_only"}
 
 
 class Target(BaseModel):
@@ -20,6 +22,26 @@ class Target(BaseModel):
     match_mode: str = "brand_size"
     category: int | None = None
     max_price: float | None = None
+
+    @model_validator(mode="after")
+    def _check(self) -> Target:
+        if self.match_mode not in _MODES:
+            raise ValueError(
+                f"{self.brand}: unknown match_mode {self.match_mode!r}. "
+                f"Expected one of {sorted(_MODES)}."
+            )
+        if not self.aliases:
+            raise ValueError(f"{self.brand}: aliases must not be empty, nothing would match.")
+        # An empty `sizes` under brand_size used to match every listing carrying
+        # the brand, silently. Forgetting a size is a plausible typo, and the
+        # failure looked like a flood of unrelated results rather than an error.
+        # Matching on brand alone is now something you have to ask for.
+        if self.match_mode == "brand_size" and not self.sizes:
+            raise ValueError(
+                f"{self.brand}: brand_size requires sizes. "
+                f"Use match_mode: \"brand_only\" if matching on brand alone is intended."
+            )
+        return self
 
 
 class Profile(BaseModel):

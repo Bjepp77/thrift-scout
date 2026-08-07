@@ -132,8 +132,8 @@ def match_item(item: dict, target: Target) -> dict[str, str] | None:
     if not brand:
         return None
 
-    if target.match_mode == "keyword_pair":
-        return {"brand_matched": brand, "size_matched": "", "match_mode": "keyword_pair"}
+    if target.match_mode in ("keyword_pair", "brand_only"):
+        return {"brand_matched": brand, "size_matched": "", "match_mode": target.match_mode}
 
     size = match_size(title, target.sizes)
     if size is None:

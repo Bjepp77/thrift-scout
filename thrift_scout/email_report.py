@@ -4,6 +4,7 @@ import logging
 import smtplib
 import time
 from datetime import datetime
+from html import escape
 from email.mime.text import MIMEText
 from pathlib import Path
 
@@ -49,8 +50,43 @@ def render_empty_report() -> str:
     )
 
 
+def _error_items(errors: list[str]) -> str:
+    # Error text carries exception messages and search terms, so it is escaped:
+    # an unescaped "<" silently swallowed the rest of the list in the client.
+    return "".join(
+        f'<li style="color:#C0392B;margin:4px 0;">{escape(str(e))}</li>' for e in errors
+    )
+
+
+def prepend_error_banner(html: str, errors: list[str]) -> str:
+    """Put a visible failure notice above an otherwise normal report.
+
+    A run can succeed partially: some searches fail while others match. Without
+    this the digest looked entirely healthy and the failures were only ever
+    visible in the Actions log, which nobody reads on a good day.
+    """
+    if not errors:
+        return html
+    banner = (
+        '<div style="max-width:600px;margin:0 auto 16px;background:#FDEDEC;'
+        'border-left:4px solid #C0392B;border-radius:6px;padding:16px 20px;'
+        'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;">'
+        '<p style="margin:0 0 8px;color:#C0392B;font-weight:600;font-size:14px;">'
+        f"This scan finished with {len(errors)} error"
+        f"{'s' if len(errors) != 1 else ''} — results may be incomplete.</p>"
+        f'<ul style="margin:0;padding-left:20px;font-size:13px;">{_error_items(errors)}</ul>'
+        "</div>"
+    )
+    marker = "<body"
+    idx = html.find(marker)
+    if idx == -1:
+        return banner + html
+    close = html.find(">", idx)
+    return html[: close + 1] + banner + html[close + 1 :] if close != -1 else banner + html
+
+
 def render_error_report(errors: list[str]) -> str:
-    li = "".join(f'<li style="color:#C0392B;margin:4px 0;">{e}</li>' for e in errors)
+    li = _error_items(errors)
     ts = datetime.now().strftime("%B %d, %Y at %I:%M %p")
     return _WRAP.format(
         extra_style="",

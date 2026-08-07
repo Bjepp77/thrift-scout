@@ -53,24 +53,28 @@ profiles:
       - brand: "Tissot Watch"
         aliases: ["Tissot"]
         sizes: []
+        match_mode: "brand_only"   # watches have no size to match on
         gender: "mens"
         exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
 
       - brand: "Montblanc Watch"
         aliases: ["Montblanc", "Mont Blanc"]
         sizes: []
+        match_mode: "brand_only"   # watches have no size to match on
         gender: "mens"
         exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
 
       - brand: "Breitling Watch"
         aliases: ["Breitling"]
         sizes: []
+        match_mode: "brand_only"   # watches have no size to match on
         gender: "mens"
         exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
 
       - brand: "IWC Watch"
         aliases: ["IWC", "International Watch Co"]
         sizes: []
+        match_mode: "brand_only"   # watches have no size to match on
         gender: "mens"
         exclude: ["strap only", "band only", "box only", "parts only", "replica", "fake", "homage", "broken", "ladies", "lady's", "lady", "woman's", "woman"]
 
@@ -89,6 +93,7 @@ profiles:
       - brand: "Sendero Hat"
         aliases: ["Sendero"]
         sizes: []
+        match_mode: "brand_only"   # hats have no size, brand match is the point
         exclude: ["kids", "youth"]
 
       - brand: "Vuori Shoes"
